@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+
+company_ps/
+
+*.log
+coverage/
+dist/
