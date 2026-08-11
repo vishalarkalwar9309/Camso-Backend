@@ -1,0 +1,37 @@
+/**
+ * prisma/schema/schema.prisma
+ *
+ * WHAT THIS FILE DOES:
+ *   Shared Prisma root configuration file.
+ *   Lives inside the schema/ directory alongside all domain schema files,
+ *   as required by the Prisma 6.x multi-file schema configuration via prisma.config.js.
+ *
+ * OVERALL DESIGN:
+ *   Prisma 6.x multi-file schema GA feature.
+ *   prisma.config.js (project root) points the schema to the prisma/schema/ directory.
+ *   Prisma automatically aggregates all .prisma files in that directory.
+ *   This file declares ONLY the generator and datasource — no models.
+ *
+ * ELEMENTS:
+ *   generator client   — configures Prisma Client JS output
+ *   datasource db      — configures PostgreSQL connection via DATABASE_URL env var
+ *
+ * FINAL OUTPUT:
+ *   After `prisma generate`, Prisma combines all prisma/schema/*.prisma files
+ *   into a single typed Prisma Client in node_modules/@prisma/client.
+ *
+ * OWNERSHIP:
+ *   SHARED — Day 1 only. Both Aary and Vishal must coordinate any changes.
+ *
+ * REFERENCE: docs/CAMSO_Backend_Plan.md Section 4 (Repository structure)
+ */
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

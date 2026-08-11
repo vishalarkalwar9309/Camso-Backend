@@ -1,0 +1,177 @@
+/**
+ * prisma/schema/engagement.prisma
+ *
+ * WHAT THIS FILE DOES:
+ *   Defines Aary's engagement domain tables: notifications and campaigns.
+ *
+ * OVERALL DESIGN:
+ *   Part of the Prisma 6.x multi-file schema.
+ *   OWNED BY AARY. Vishal must not edit it.
+ *
+ * TABLES IN THIS FILE:
+ *   Notification  — push notification records (title/body via Translation)
+ *   Campaign      — campaign targeting configuration
+ *
+ * KEY DESIGN DECISIONS:
+ *   - Campaign.scheduled_at is INFORMATIONAL ONLY for Launch 1.
+ *     No scheduler/cron drives it. True scheduled execution is a Phase 2+ item.
+ *   - Campaign send flow: POST /admin/campaigns creates DRAFT.
+ *     POST /admin/campaigns/:id/send resolves targeting + calls FCM immediately.
+ *   - Campaign status enum has only DRAFT and SENT for Launch 1.
+ *   - FCM sends are batched at 500 tokens max. Deduplication + invalid-token
+ *     cleanup handled in campaigns.service.js.
+ *
+ * CROSS-REFERENCES:
+ *   - Notification.created_by → AdminUser (content.prisma)
+ *   - Campaign.created_by → AdminUser (content.prisma)
+ *   - Notification.product_id → products (catalogue.prisma, Vishal's)
+ *   - Campaign targeting queries users/user_devices via Aary's own repository
+ *
+ * FINAL OUTPUT:
+ *   2 tables in PostgreSQL.
+ *
+ * OWNERSHIP: AARY — engagement.prisma
+ * REFERENCE: docs/CAMSO_Backend_Plan_Aary.md Section 3 (engagement.prisma)
+ */
+
+// ─── Notification Type ────────────────────────────────────────────────────────
+
+/**
+ * NotificationType enum — the type of push notification.
+ */
+enum NotificationType {
+  NEW_LAUNCH
+  DISCONTINUED
+  PROMOTION
+}
+
+/**
+ * NotificationStatus enum — lifecycle status of a notification.
+ */
+enum NotificationStatus {
+  DRAFT
+  SENT
+}
+
+// ─── Notification ─────────────────────────────────────────────────────────────
+
+/**
+ * Notification
+ *
+ * USE: A single push notification record.
+ *      Title and body are stored via the Translation table
+ *      (entity_type="NOTIFICATION", fields: "title", "body").
+ *      Sending happens through Campaign.send, not by creating a Notification alone.
+ *
+ * CONTAINS:
+ *   id                — Auto-increment PK.
+ *   product_id        — Optional FK to products (Vishal's table). Nullable.
+ *   campaign_id       — Optional FK to Campaign (if this notification is part of a campaign).
+ *   notification_type — Type of notification (enum).
+ *   created_by        — FK to AdminUser who created the notification.
+ *   status            — DRAFT | SENT.
+ *   sent_at           — Timestamp when actually sent (null until sent).
+ *   created_at        — Creation timestamp.
+ *   updated_at        — Last modification timestamp.
+ *
+ * KEY DESIGN:
+ *   Creating or editing a notification does NOT send it.
+ *   Sending only happens when invoked by the campaign send flow.
+ *   product_id is a cross-domain reference (no Prisma relation declared).
+ */
+model Notification {
+  id                Int                @id @default(autoincrement())
+  product_id        Int?
+  campaign_id       Int?
+  notification_type NotificationType
+  created_by        Int
+  status            NotificationStatus @default(DRAFT)
+  sent_at           DateTime?
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+
+  campaign   Campaign?  @relation(fields: [campaign_id], references: [id])
+  admin_user AdminUser  @relation(fields: [created_by], references: [id])
+
+  @@index([campaign_id])
+  @@index([created_by])
+  @@index([status])
+  @@map("notifications")
+}
+
+// ─── Campaign Target ──────────────────────────────────────────────────────────
+
+/**
+ * CampaignTargetType enum — how the campaign resolves its recipient list.
+ *
+ * ALL_USERS       — all active user_devices
+ * BUSINESS_TYPE   — users WHERE business_type = target_value
+ * LANGUAGE        — users WHERE preferred_language = target_value
+ * COUNTRY         — users WHERE country_code = target_value
+ */
+enum CampaignTargetType {
+  ALL_USERS
+  BUSINESS_TYPE
+  LANGUAGE
+  COUNTRY
+}
+
+/**
+ * CampaignStatus enum — lifecycle status of a campaign.
+ */
+enum CampaignStatus {
+  DRAFT
+  SENT
+}
+
+// ─── Campaign ─────────────────────────────────────────────────────────────────
+
+/**
+ * Campaign
+ *
+ * USE: Campaign targeting configuration. A campaign defines WHO receives
+ *      the push notification. The actual send is triggered by POST /send.
+ *
+ * CONTAINS:
+ *   id           — Auto-increment PK.
+ *   name         — Human-readable campaign label.
+ *   target_type  — Targeting strategy (enum).
+ *   target_value — Optional filter value (e.g. "Distributor", "fr", "IN").
+ *                  Null when target_type = ALL_USERS.
+ *   status       — DRAFT | SENT.
+ *   scheduled_at — Informational only for Launch 1. No cron drives this.
+ *   created_by   — FK to AdminUser who created the campaign.
+ *   created_at   — Creation timestamp.
+ *   updated_at   — Last modification timestamp.
+ *
+ * KEY DESIGN:
+ *   Target resolution (reading users + user_devices) happens in
+ *   campaigns.repository.js using Prisma directly against Vishal's tables.
+ *   Never import Vishal's repositories or services.
+ *
+ *   FCM send batching rules (from plan Section 6):
+ *     - Max 500 tokens per FCM batch call
+ *     - Deduplicate tokens before batching
+ *     - Collect per-target failures
+ *     - Mark UNREGISTERED tokens as inactive in user_devices
+ *     - status → SENT after operation completes (even with partial failures)
+ *     - Response: { targetCount, successCount, failureCount }
+ */
+model Campaign {
+  id           Int                 @id @default(autoincrement())
+  name         String              @db.VarChar(255)
+  target_type  CampaignTargetType
+  target_value String?             @db.VarChar(100)
+  status       CampaignStatus      @default(DRAFT)
+  scheduled_at DateTime?
+  created_by   Int
+  created_at   DateTime            @default(now())
+  updated_at   DateTime            @updatedAt
+
+  admin_user    AdminUser      @relation(fields: [created_by], references: [id])
+  notifications Notification[]
+
+  @@index([created_by])
+  @@index([status])
+  @@map("campaigns")
+}

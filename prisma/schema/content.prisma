@@ -1,0 +1,394 @@
+/**
+ * prisma/schema/content.prisma
+ *
+ * WHAT THIS FILE DOES:
+ *   Defines Aary's content domain tables: admin_users, documents,
+ *   document_files, testimonials, faqs, dealers, feedback, app_content.
+ *
+ * OVERALL DESIGN:
+ *   Part of the Prisma 6.x multi-file schema.
+ *   This file is OWNED BY AARY. Vishal must not edit it.
+ *   Edit procedure: git pull → edit → commit + push → heads-up in chat.
+ *
+ * TABLES IN THIS FILE:
+ *   AdminUser      — admin accounts with role-based access
+ *   Document       — CMS documents (catalogues, manuals, etc.)
+ *   DocumentFile   — per-language files linked to a document
+ *   Testimonial    — customer testimonials
+ *   Faq            — frequently asked questions
+ *   Dealer         — dealer/distributor directory
+ *   Feedback       — VOC feedback from users
+ *   AppContent     — static CMS pages (about, contact, legal, settings)
+ *
+ * NAMING CONVENTION:
+ *   CMS text/media content uses `is_published` (documents, testimonials, faqs).
+ *   Operational entities use `is_active` (dealers, admin_users).
+ *   This is intentional — see docs/CAMSO_Backend_Plan.md Section 7.
+ *
+ * CROSS-REFERENCES:
+ *   - MediaAsset is defined in core.prisma (shared)
+ *   - RefreshToken references admin_user_id → AdminUser (this file)
+ *   - AuditLog.actor_id references admin_users implicitly (no FK enforced)
+ *   - products and categories FK targets are defined in catalogue.prisma (Vishal)
+ *
+ * FINAL OUTPUT:
+ *   8 tables created in PostgreSQL during migration.
+ *
+ * OWNERSHIP: AARY — content.prisma
+ * REFERENCE: docs/CAMSO_Backend_Plan_Aary.md Section 3 (content.prisma)
+ */
+
+// ─── Admin Users ─────────────────────────────────────────────────────────────
+
+/**
+ * AdminUser
+ *
+ * USE: Stores admin accounts for the CAMSO CMS.
+ *      This is NOT the end-user table (that is `users` in catalogue.prisma).
+ *
+ * CONTAINS:
+ *   id            — Auto-increment PK.
+ *   email         — Unique login identifier.
+ *   password_hash — Bcrypt hash. Plain password NEVER stored.
+ *   is_active     — Soft-deactivation flag (deactivated = cannot login/refresh).
+ *   role          — Access control role (see AdminRole enum).
+ *   created_at    — Creation timestamp.
+ *   updated_at    — Last modification timestamp.
+ *
+ * ROLE PERMISSIONS (from master plan Section 5):
+ *   SUPER_ADMIN    — everything, incl. admin-user management + audit_logs read
+ *   CONTENT_ADMIN  — CRUD on products, categories, documents, testimonials, FAQs, dealers
+ *   MARKETING      — CRUD + send on notifications / campaigns only
+ *   VIEWER         — read-only on all /admin/* routes
+ *
+ * KEY DESIGN:
+ *   Deactivation (is_active=false) must also revoke all active refresh_tokens.
+ *   This is enforced in the service layer (admin-users.service.js), not here.
+ *
+ * IMPORTS USED IN:
+ *   admin-auth.service.js, admin-users.service.js, all admin route guards
+ */
+
+enum AdminRole {
+  SUPER_ADMIN
+  CONTENT_ADMIN
+  MARKETING
+  VIEWER
+}
+
+model AdminUser {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(255)
+  password_hash String    @db.VarChar(255)
+  is_active     Boolean   @default(true)
+  role          AdminRole
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  media_assets    MediaAsset[]
+  refresh_tokens  RefreshToken[]
+  notifications   Notification[]
+  campaigns       Campaign[]
+
+  @@map("admin_users")
+}
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+
+/**
+ * DocumentType enum — supported document categories.
+ * CATALOGUE | BROCHURE | MANUAL | TECHNICAL_GUIDE | BULLETIN | WARRANTY | VIDEO
+ */
+enum DocumentType {
+  CATALOGUE
+  BROCHURE
+  MANUAL
+  TECHNICAL_GUIDE
+  BULLETIN
+  WARRANTY
+  VIDEO
+}
+
+/**
+ * Document
+ *
+ * USE: CMS entity for product-related documents.
+ *      Titles are stored via the Translation table (entity_type="DOCUMENT").
+ *      Actual files are linked via DocumentFile.
+ *
+ * CONTAINS:
+ *   id            — Auto-increment PK.
+ *   product_id    — Optional FK to products (Vishal's table). Nullable for non-product docs.
+ *   category_id   — Optional FK to categories (Vishal's table). Nullable.
+ *   document_type — Type of document (enum).
+ *   is_published  — CMS publish gate. Public API returns only published=true.
+ *   created_at    — Creation timestamp.
+ *   updated_at    — Last modification timestamp.
+ *
+ * KEY DESIGN:
+ *   Default is_published=false → new documents are drafts until explicitly published.
+ *   product_id and category_id are cross-domain references to Vishal's tables.
+ *   No Prisma-level relation declared to avoid tight coupling across ownership boundaries;
+ *   referential integrity is application-level.
+ *
+ * AUDIT: PUBLISH/UNPUBLISH/UPDATE events written by documents.service.js.
+ */
+model Document {
+  id            Int          @id @default(autoincrement())
+  product_id    Int?
+  category_id   Int?
+  document_type DocumentType
+  is_published  Boolean      @default(false)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  files DocumentFile[]
+
+  @@index([product_id])
+  @@index([category_id])
+  @@index([is_published])
+  @@map("documents")
+}
+
+/**
+ * DocumentFile
+ *
+ * USE: Language-specific file attached to a Document.
+ *      One document can have one file per language.
+ *
+ * CONTAINS:
+ *   id                   — Auto-increment PK.
+ *   document_id          — FK to Document.
+ *   language_code        — FK to Language (which language this file is for).
+ *   media_asset_id       — FK to MediaAsset (the uploaded file record).
+ *   is_offline_downloadable — Whether the mobile app should cache this file locally.
+ *
+ * KEY DESIGN:
+ *   Unique constraint on (document_id, language_code) prevents duplicate
+ *   files per language per document.
+ */
+model DocumentFile {
+  id                    Int      @id @default(autoincrement())
+  document_id           Int
+  language_code         String   @db.VarChar(10)
+  media_asset_id        Int
+  is_offline_downloadable Boolean @default(false)
+
+  document    Document   @relation(fields: [document_id], references: [id])
+  media_asset MediaAsset @relation(fields: [media_asset_id], references: [id])
+
+  @@unique([document_id, language_code])
+  @@map("document_files")
+}
+
+// ─── Testimonials ────────────────────────────────────────────────────────────
+
+/**
+ * StoryType enum — the type of customer story.
+ */
+enum StoryType {
+  SOLIDS
+  OPERATING_COST
+  WORN_PRODUCT_REPLACEMENT
+  REPEAT_PURCHASE
+}
+
+/**
+ * Testimonial
+ *
+ * USE: Customer testimonial/story for a product or brand.
+ *
+ * CONTAINS:
+ *   id             — Auto-increment PK.
+ *   product_id     — Optional FK to products.
+ *   customer_name  — Display name of the customer.
+ *   region         — Geographic region string.
+ *   story_type     — Type of success story (enum).
+ *   content        — Body text of the testimonial.
+ *   media_asset_id — Optional FK to MediaAsset (photo/video).
+ *   is_published   — CMS publish gate. Default false (draft).
+ *   created_at     — Creation timestamp.
+ *   updated_at     — Last modification timestamp.
+ */
+model Testimonial {
+  id             Int       @id @default(autoincrement())
+  product_id     Int?
+  customer_name  String    @db.VarChar(255)
+  region         String    @db.VarChar(100)
+  story_type     StoryType
+  content        String    @db.Text
+  media_asset_id Int?
+  is_published   Boolean   @default(false)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  media_asset MediaAsset? @relation(fields: [media_asset_id], references: [id])
+
+  @@index([product_id])
+  @@index([is_published])
+  @@map("testimonials")
+}
+
+// ─── FAQs ─────────────────────────────────────────────────────────────────────
+
+/**
+ * FaqCategory enum — FAQ grouping category.
+ */
+enum FaqCategory {
+  COMPANY
+  PRODUCT
+  DISTRIBUTION
+}
+
+/**
+ * Faq
+ *
+ * USE: Frequently asked question. Question and answer are stored in
+ *      the Translation table (entity_type="FAQ", fields: "question", "answer").
+ *
+ * CONTAINS:
+ *   id           — Auto-increment PK.
+ *   product_id   — Optional FK to products.
+ *   category     — FAQ category (enum).
+ *   sort_order   — Display order within category. Lower = displayed first.
+ *   is_published — CMS publish gate. Default false (draft).
+ *   created_at   — Creation timestamp.
+ *   updated_at   — Last modification timestamp.
+ */
+model Faq {
+  id           Int         @id @default(autoincrement())
+  product_id   Int?
+  category     FaqCategory
+  sort_order   Int         @default(0)
+  is_published Boolean     @default(false)
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+
+  @@index([product_id])
+  @@index([category, is_published])
+  @@map("faqs")
+}
+
+// ─── Dealers ──────────────────────────────────────────────────────────────────
+
+/**
+ * DealerType enum — dealer or distributor.
+ */
+enum DealerType {
+  DEALER
+  DISTRIBUTOR
+}
+
+/**
+ * Dealer
+ *
+ * USE: Dealer and distributor directory for the locator feature.
+ *      Haversine distance calculated in SQL at query time — no PostGIS.
+ *
+ * CONTAINS:
+ *   id        — Auto-increment PK.
+ *   name      — Dealer/distributor business name.
+ *   type      — DEALER or DISTRIBUTOR.
+ *   address   — Street address.
+ *   city      — City name.
+ *   state     — State/province.
+ *   country   — Country (ISO 3166-1 alpha-2 recommended).
+ *   geo_lat   — Latitude (decimal degrees).
+ *   geo_lng   — Longitude (decimal degrees).
+ *   phone     — Contact phone number.
+ *   email     — Contact email.
+ *   has_csr   — Whether this dealer has a CSR contact.
+ *   is_active — Operational active flag. Default true.
+ *
+ * KEY DESIGN:
+ *   Uses is_active (not is_published) — dealers are operational entities,
+ *   not CMS content. This distinction is documented in the master plan.
+ */
+model Dealer {
+  id        Int        @id @default(autoincrement())
+  name      String     @db.VarChar(255)
+  type      DealerType
+  address   String     @db.Text
+  city      String     @db.VarChar(100)
+  state     String     @db.VarChar(100)
+  country   String     @db.VarChar(10)
+  geo_lat   Decimal    @db.Decimal(10, 7)
+  geo_lng   Decimal    @db.Decimal(10, 7)
+  phone     String?    @db.VarChar(50)
+  email     String?    @db.VarChar(255)
+  has_csr   Boolean    @default(false)
+  is_active Boolean    @default(true)
+
+  @@index([country, is_active])
+  @@index([geo_lat, geo_lng])
+  @@map("dealers")
+}
+
+// ─── Feedback ─────────────────────────────────────────────────────────────────
+
+/**
+ * FeedbackBucket enum — VOC feedback category.
+ */
+enum FeedbackBucket {
+  PRODUCT
+  SERVICE
+  PRICING
+}
+
+/**
+ * Feedback
+ *
+ * USE: Voice-of-customer feedback submitted by end users.
+ *      No hard delete — records are retained for analytics.
+ *
+ * CONTAINS:
+ *   id         — Auto-increment PK.
+ *   user_id    — Optional FK to users (nullable for guest sessions).
+ *   device_id  — Client device identifier.
+ *   product_id — Optional FK to products.
+ *   bucket     — Feedback category (enum).
+ *   rating     — Integer rating (1–5).
+ *   comment    — Optional free-text comment.
+ *   created_at — Submission timestamp.
+ *
+ * KEY DESIGN:
+ *   user_id references users in catalogue.prisma (Vishal).
+ *   Queried cross-domain via Aary's own repository.
+ */
+model Feedback {
+  id         Int            @id @default(autoincrement())
+  user_id    Int?
+  device_id  String         @db.VarChar(255)
+  product_id Int?
+  bucket     FeedbackBucket
+  rating     Int
+  comment    String?        @db.Text
+  created_at DateTime       @default(now())
+
+  @@index([user_id])
+  @@index([product_id])
+  @@index([bucket])
+  @@map("feedback")
+}
+
+// ─── App Content ──────────────────────────────────────────────────────────────
+
+/**
+ * AppContent
+ *
+ * USE: Static CMS pages managed through the admin panel.
+ *      Content (body text, etc.) stored in Translation table.
+ *      Keys: "about", "contact", "legal", "settings".
+ *
+ * CONTAINS:
+ *   id    — Auto-increment PK.
+ *   key   — Unique slug for the content page.
+ *   extra — Optional JSONB for structured supplementary data.
+ */
+model AppContent {
+  id    Int     @id @default(autoincrement())
+  key   String  @unique @db.VarChar(50)
+  extra Json?
+
+  @@map("app_content")
+}

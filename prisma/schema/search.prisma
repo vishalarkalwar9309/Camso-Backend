@@ -1,0 +1,71 @@
+/**
+ * prisma/schema/search.prisma
+ *
+ * WHAT THIS FILE DOES:
+ *   Defines Vishal's search domain tables: search_logs, popular_searches, bookmarks.
+ *
+ * OVERALL DESIGN:
+ *   Part of the Prisma 6.x multi-file schema.
+ *   OWNED BY VISHAL. Aary must not edit this file.
+ *   Stub created on Day 1 for schema completeness.
+ *
+ * TABLES IN THIS FILE:
+ *   SearchLog       — per-query search event log
+ *   PopularSearch   — aggregated search hit counts
+ *   Bookmark        — user/device product bookmarks (partial unique indexes)
+ *
+ * KEY DESIGN (Bookmarks):
+ *   Partial unique indexes (not a plain @@unique) are required to handle
+ *   nullable user_id/device_id correctly. These are added via hand-edited
+ *   migration SQL — see docs/CAMSO_Backend_Plan.md Section 4.
+ *
+ * OWNERSHIP: VISHAL — search.prisma
+ * REFERENCE: docs/CAMSO_Backend_Plan.md Section 7 (Vishal's tables)
+ */
+
+/**
+ * SearchLog — individual search event.
+ */
+model SearchLog {
+  id            Int      @id @default(autoincrement())
+  user_id       Int?
+  device_id     String   @db.VarChar(255)
+  query_text    String   @db.VarChar(500)
+  filters       Json?
+  results_count Int      @default(0)
+  created_at    DateTime @default(now())
+
+  @@index([user_id])
+  @@map("search_logs")
+}
+
+/**
+ * PopularSearch — aggregated search hit counts (materialized/updated by search service).
+ */
+model PopularSearch {
+  query_text   String   @id @db.VarChar(500)
+  hit_count    Int      @default(1)
+  last_updated DateTime @default(now()) @updatedAt
+
+  @@map("popular_searches")
+}
+
+/**
+ * Bookmark — user/guest product bookmark.
+ *
+ * KEY DESIGN:
+ *   user_id and device_id are both nullable.
+ *   Uniqueness is enforced via PARTIAL INDEXES in a hand-edited migration
+ *   (not via @@unique in PSL) — see docs/CAMSO_Backend_Plan.md Section 4.
+ */
+model Bookmark {
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
+  device_id  String?  @db.VarChar(255)
+  product_id Int
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+  @@index([device_id])
+  @@map("bookmarks")
+}

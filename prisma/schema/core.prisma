@@ -1,0 +1,271 @@
+/**
+ * prisma/schema/core.prisma
+ *
+ * WHAT THIS FILE DOES:
+ *   Defines the shared core database tables used across the entire
+ *   CAMSO backend. These tables are not owned by any single domain;
+ *   both Aary and Vishal rely on them.
+ *
+ * OVERALL DESIGN:
+ *   Part of the Prisma 6.x multi-file schema setup.
+ *   This file is built once on Day 1 and then left alone.
+ *   Do not add feature-specific columns here.
+ *
+ * TABLES IN THIS FILE:
+ *   Language          — available languages (code PK)
+ *   Translation       — polymorphic i18n values (entity_type + entity_id + field + language_code)
+ *   MediaAsset        — uploaded files metadata (Firebase Storage)
+ *   AuditLog          — immutable audit trail for all admin mutations
+ *   RefreshToken      — refresh token store with rotation + reuse-detection support
+ *
+ * KEY DESIGN DECISIONS:
+ *   - Translation.entity_id is intentionally NOT a real FK. The polymorphic
+ *     pattern requires application-level referential integrity.
+ *     This is a documented trade-off, not an oversight. (See README.)
+ *   - RefreshToken has a CHECK constraint ensuring exactly one of
+ *     user_id or admin_user_id is non-null. The constraint is enforced
+ *     at the DB level via a migration hand-edit (not expressible in PSL).
+ *   - AuditLog.actor_type is fixed to "ADMIN" for Launch 1.
+ *     Only admin operations are audited at the DB level.
+ *   - Hard DELETE is never performed on content tables.
+ *     AuditLog is append-only; no soft-delete pattern applies here.
+ *
+ * FINAL OUTPUT:
+ *   Five tables created in PostgreSQL during initial migration.
+ *
+ * OWNERSHIP:
+ *   SHARED — Aary + Vishal, Day 1 only.
+ *   Do not edit alone after Day 1.
+ *
+ * REFERENCE: docs/CAMSO_Backend_Plan.md Section 7 (Core tables)
+ */
+
+// ─── Languages ──────────────────────────────────────────────────────────────
+
+/**
+ * Language
+ *
+ * USE: Lookup table for all supported UI/content languages.
+ *      Used as FK target by Translation and RefreshToken.
+ *
+ * CONTAINS:
+ *   code      — ISO 639-1 language code (e.g. "en", "fr"). Primary key.
+ *   name      — Human-readable name (e.g. "English").
+ *   is_active — Whether this language is currently available in the app.
+ *
+ * KEY DESIGN:
+ *   String PK (language code) instead of integer to make translation
+ *   queries readable without joins.
+ */
+model Language {
+  code      String   @id @db.VarChar(10)
+  name      String   @db.VarChar(100)
+  is_active Boolean  @default(true)
+
+  translations  Translation[]
+  refresh_tokens RefreshToken[]
+
+  @@map("languages")
+}
+
+// ─── Translations ────────────────────────────────────────────────────────────
+
+/**
+ * Translation
+ *
+ * USE: Polymorphic i18n store. Holds the translated value for any
+ *      field on any entity across the backend.
+ *
+ * CONTAINS:
+ *   id            — Auto-increment PK.
+ *   entity_type   — String name of the owning entity (e.g. "FAQ", "DOCUMENT").
+ *   entity_id     — Integer ID of the owning record. NOT a real FK — polymorphic.
+ *   field         — Field name being translated (e.g. "question", "title").
+ *   language_code — FK to Language.code.
+ *   value         — The translated string value.
+ *
+ * KEY DESIGN:
+ *   Unique composite constraint on (entity_type, entity_id, field, language_code)
+ *   ensures no duplicate translations per field+language per entity.
+ *   entity_id is intentionally not a DB-level FK (polymorphic pattern).
+ *   Application code is responsible for deleting orphaned translations
+ *   when a parent entity is removed.
+ *
+ * TECHNOLOGIES:
+ *   Prisma 6.x — @@unique constraint declared in PSL.
+ */
+model Translation {
+  id            Int      @id @default(autoincrement())
+  entity_type   String   @db.VarChar(100)
+  entity_id     Int
+  field         String   @db.VarChar(100)
+  language_code String   @db.VarChar(10)
+  value         String   @db.Text
+
+  language Language @relation(fields: [language_code], references: [code])
+
+  @@unique([entity_type, entity_id, field, language_code])
+  @@index([entity_type, entity_id])
+  @@map("translations")
+}
+
+// ─── Media Assets ────────────────────────────────────────────────────────────
+
+/**
+ * MediaAsset
+ *
+ * USE: Metadata record for every file uploaded through the backend.
+ *      Actual files live in Firebase Storage; this table stores the
+ *      URL and metadata returned after server-side upload.
+ *
+ * CONTAINS:
+ *   id                  — Auto-increment PK.
+ *   url                 — Public Firebase Storage URL.
+ *   filename            — Original filename as uploaded.
+ *   mime_type           — MIME type (e.g. "application/pdf", "image/jpeg").
+ *   size_bytes          — File size in bytes.
+ *   uploaded_by_admin_id— FK to admin_users.id. Every Launch-1 upload is admin.
+ *   created_at          — Upload timestamp.
+ *
+ * KEY DESIGN:
+ *   uploaded_by_admin_id references admin_users which lives in content.prisma.
+ *   Prisma handles cross-file references within the same schema/ directory.
+ *   No signed URLs — all uploads are server-mediated (Admin SDK).
+ *
+ * IMPORTS USED IN:
+ *   DocumentFile, Testimonial, ProductImage (via media_asset_id FK)
+ */
+model MediaAsset {
+  id                   Int      @id @default(autoincrement())
+  url                  String   @db.Text
+  filename             String   @db.VarChar(255)
+  mime_type            String   @db.VarChar(100)
+  size_bytes           Int
+  uploaded_by_admin_id Int
+  created_at           DateTime @default(now())
+
+  // Relation defined in content.prisma (AdminUser model)
+  uploaded_by AdminUser @relation(fields: [uploaded_by_admin_id], references: [id])
+
+  // Back-relations (defined in their respective domain schema files)
+  document_files   DocumentFile[]
+  testimonials     Testimonial[]
+  product_images   ProductImage[] @relation("ProductImageAsset")
+
+  @@map("media_assets")
+}
+
+// ─── Audit Logs ──────────────────────────────────────────────────────────────
+
+/**
+ * AuditLog
+ *
+ * USE: Immutable audit trail for all admin mutations.
+ *      Written explicitly by each module's service.js — NOT by middleware.
+ *      Middleware cannot know before/after state; only the service can.
+ *
+ * CONTAINS:
+ *   id          — Auto-increment PK.
+ *   actor_type  — Always "ADMIN" in Launch 1.
+ *   actor_id    — ID of the admin_user who performed the action.
+ *   action      — Enum: CREATE | UPDATE | DELETE | PUBLISH | UNPUBLISH | LOGIN.
+ *   entity_type — String name of the mutated entity (e.g. "DOCUMENT", "FAQ").
+ *   entity_id   — ID of the mutated record (nullable for LOGIN events).
+ *   changes     — JSONB capturing before/after state for mutations.
+ *   ip_address  — Request IP (populated from req.auditContext by the service).
+ *   user_agent  — Request User-Agent string.
+ *   created_at  — Immutable timestamp.
+ *
+ * KEY DESIGN:
+ *   Records are never updated or soft-deleted — append-only by convention.
+ *   LOGIN events use entity_type="AUTH" and entity_id=null.
+ *   Failed logins go to Winston logs, NOT here, to avoid brute-force noise.
+ *   The audit write pattern:
+ *     controller → service → mutation → auditService.record()
+ *
+ * REFERENCE: docs/CAMSO_Backend_Plan.md Section 11 (Audit Architecture)
+ */
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  PUBLISH
+  UNPUBLISH
+  LOGIN
+}
+
+model AuditLog {
+  id          Int         @id @default(autoincrement())
+  actor_type  String      @default("ADMIN") @db.VarChar(20)
+  actor_id    Int
+  action      AuditAction
+  entity_type String      @db.VarChar(100)
+  entity_id   Int?
+  changes     Json?
+  ip_address  String?     @db.VarChar(50)
+  user_agent  String?     @db.Text
+  created_at  DateTime    @default(now())
+
+  @@index([actor_id])
+  @@index([entity_type, entity_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+// ─── Refresh Tokens ──────────────────────────────────────────────────────────
+
+/**
+ * RefreshToken
+ *
+ * USE: Persistent store for refresh tokens supporting rotation
+ *      and reuse-detection (token replay attack mitigation).
+ *
+ * CONTAINS:
+ *   id               — Auto-increment PK.
+ *   user_id          — FK to users.id (nullable). Set for end-users.
+ *   admin_user_id    — FK to admin_users.id (nullable). Set for admins.
+ *   token_hash       — Bcrypt/SHA-256 hash of the actual token. Never store plaintext.
+ *   expires_at       — Expiry timestamp.
+ *   revoked_at       — Nullable — set when this token is revoked.
+ *   device_id        — Client device identifier (informational).
+ *   created_at       — Creation timestamp.
+ *
+ * KEY DESIGN:
+ *   DB-level CHECK constraint ensures exactly one of user_id / admin_user_id
+ *   is non-null. This constraint must be added via a hand-edited migration
+ *   SQL file because PSL cannot express it directly:
+ *     CHECK ((user_id IS NOT NULL) <> (admin_user_id IS NOT NULL))
+ *
+ *   Rotation pattern (implemented in tokenService.rotate()):
+ *     1. Hash incoming token.
+ *     2. Find non-revoked, non-expired row matching hash.
+ *     3. If found → revoke it, issue new access+refresh pair.
+ *     4. If not found / already revoked → treat as replay attack:
+ *        revoke ALL active tokens for that principal, force re-login.
+ *
+ * IMPORTS USED IN:
+ *   tokenService.js, admin-auth.service.js, auth.service.js
+ *
+ * REFERENCE: docs/CAMSO_Backend_Plan.md Section 7 (refresh_tokens)
+ */
+model RefreshToken {
+  id            Int       @id @default(autoincrement())
+  user_id       Int?
+  admin_user_id Int?
+  token_hash    String    @unique @db.VarChar(255)
+  expires_at    DateTime
+  revoked_at    DateTime?
+  device_id     String?   @db.VarChar(255)
+  created_at    DateTime  @default(now())
+  language_code String?   @db.VarChar(10)
+
+  language   Language?  @relation(fields: [language_code], references: [code])
+  admin_user AdminUser? @relation(fields: [admin_user_id], references: [id])
+  user       User?      @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([admin_user_id])
+  @@index([token_hash])
+  @@map("refresh_tokens")
+}

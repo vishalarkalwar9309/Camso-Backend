@@ -1,0 +1,34 @@
+# ============================================================
+# Docker Compose — Local Development Only
+# ============================================================
+# Starts a local PostgreSQL instance for development.
+# Do NOT use this file for production.
+#
+# Usage:
+#   docker compose up -d        — start in background
+#   docker compose down         — stop
+#   docker compose down -v      — stop and remove data volume
+# ============================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: camso_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: camso
+      POSTGRES_PASSWORD: camso_dev
+      POSTGRES_DB: camso
+    ports:
+      - "5432:5432"
+    volumes:
+      - camso_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U camso -d camso"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  camso_pgdata:
+    driver: local

@@ -1,0 +1,205 @@
+/**
+ * prisma/schema/catalogue.prisma
+ *
+ * WHAT THIS FILE DOES:
+ *   Defines Vishal's catalogue domain tables: users, user_devices,
+ *   categories, products, product_images, product_specifications.
+ *
+ * OVERALL DESIGN:
+ *   Part of the Prisma 6.x multi-file schema.
+ *   OWNED BY VISHAL. Aary must not edit this file.
+ *   This stub is created on Day 1 so that cross-domain FK references
+ *   from core.prisma and content.prisma can validate and generate correctly.
+ *
+ * TABLES IN THIS FILE:
+ *   User                  — end-user accounts
+ *   UserDevice            — registered devices + FCM tokens
+ *   Category              — product category hierarchy
+ *   Product               — product catalogue entries
+ *   ProductImage          — product images
+ *   ProductSpecification  — product specs/dimensions/performance
+ *
+ * OWNERSHIP: VISHAL — catalogue.prisma
+ * REFERENCE: docs/CAMSO_Backend_Plan.md Section 7 (Vishal's tables)
+ */
+
+// ─── Business Type ────────────────────────────────────────────────────────────
+
+enum BusinessType {
+  Dealer
+  Distributor
+  EndUser
+  Other
+}
+
+// ─── Platform ─────────────────────────────────────────────────────────────────
+
+enum Platform {
+  ANDROID
+  IOS
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+/**
+ * User
+ *
+ * USE: End-user accounts (consumers of the CAMSO mobile app).
+ *      This is NOT the admin table — see AdminUser in content.prisma.
+ *
+ * CONTAINS:
+ *   id                 — Auto-increment PK.
+ *   email              — Nullable (guest users may not have email).
+ *   phone              — Nullable phone number.
+ *   password_hash      — Nullable (social/guest auth flows).
+ *   business_type      — Profile data used for campaign targeting.
+ *   country_code       — ISO 3166-1 alpha-2. Used for COUNTRY campaign targeting.
+ *   preferred_language — Language code. Used for LANGUAGE campaign targeting.
+ *   created_at / updated_at — Standard timestamps.
+ *
+ * KEY DESIGN:
+ *   No device_id column on User — device identity lives in UserDevice.
+ *   business_type is profile data, NOT an access-control role in Launch 1.
+ */
+model User {
+  id                 Int           @id @default(autoincrement())
+  email              String?       @unique @db.VarChar(255)
+  phone              String?       @db.VarChar(50)
+  password_hash      String?       @db.VarChar(255)
+  business_type      BusinessType?
+  country_code       String?       @db.VarChar(10)
+  preferred_language String?       @db.VarChar(10)
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+
+  devices        UserDevice[]
+  refresh_tokens RefreshToken[]
+
+  @@map("users")
+}
+
+// ─── User Device ──────────────────────────────────────────────────────────────
+
+/**
+ * UserDevice
+ *
+ * USE: Tracks registered devices and their FCM tokens.
+ *      Used for campaign targeting and push send.
+ *
+ * CONTAINS:
+ *   id          — Auto-increment PK.
+ *   user_id     — Optional FK to User (nullable for guest devices).
+ *   device_id   — Client-generated unique device identifier.
+ *   fcm_token   — Firebase Cloud Messaging registration token.
+ *   platform    — ANDROID | IOS.
+ *   app_version — App version string.
+ *   is_active   — Whether to send pushes to this device.
+ *   last_seen_at — Last activity timestamp.
+ *   created_at / updated_at — Standard timestamps.
+ */
+model UserDevice {
+  id           Int       @id @default(autoincrement())
+  user_id      Int?
+  device_id    String    @db.VarChar(255)
+  fcm_token    String    @db.VarChar(255)
+  platform     Platform
+  app_version  String?   @db.VarChar(50)
+  is_active    Boolean   @default(true)
+  last_seen_at DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([is_active])
+  @@map("user_devices")
+}
+
+// ─── Category ─────────────────────────────────────────────────────────────────
+
+/**
+ * Category
+ *
+ * USE: Hierarchical product category tree.
+ *      name/description stored in Translation (entity_type="CATEGORY").
+ */
+model Category {
+  id        Int        @id @default(autoincrement())
+  parent_id Int?
+  slug      String     @unique @db.VarChar(255)
+  is_active Boolean    @default(true)
+
+  parent   Category?  @relation("CategoryTree", fields: [parent_id], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@map("categories")
+}
+
+// ─── Spec Type ────────────────────────────────────────────────────────────────
+
+enum SpecType {
+  SPECIFICATION
+  DIMENSION
+  PERFORMANCE
+}
+
+// ─── Product ──────────────────────────────────────────────────────────────────
+
+/**
+ * Product
+ *
+ * USE: CAMSO product catalogue entry.
+ *      name/description stored in Translation (entity_type="PRODUCT").
+ *
+ * KEY DESIGN:
+ *   slug is URL-safe identifier. pid is the Camso product code.
+ */
+model Product {
+  id          Int      @id @default(autoincrement())
+  pid         String   @unique @db.VarChar(100)
+  category_id Int
+  slug        String   @unique @db.VarChar(255)
+  is_active   Boolean  @default(true)
+
+  category   Category             @relation(fields: [category_id], references: [id])
+  images     ProductImage[]
+  specs      ProductSpecification[]
+
+  @@map("products")
+}
+
+/**
+ * ProductImage — product image links to MediaAsset.
+ */
+model ProductImage {
+  id             Int     @id @default(autoincrement())
+  product_id     Int
+  media_asset_id Int
+  sort_order     Int     @default(0)
+  is_primary     Boolean @default(false)
+
+  product     Product    @relation(fields: [product_id], references: [id])
+  media_asset MediaAsset @relation("ProductImageAsset", fields: [media_asset_id], references: [id])
+
+  @@map("product_images")
+}
+
+/**
+ * ProductSpecification — technical specifications for a product.
+ */
+model ProductSpecification {
+  id            Int      @id @default(autoincrement())
+  product_id    Int
+  spec_type     SpecType
+  spec_key      String   @db.VarChar(100)
+  spec_value    String   @db.VarChar(255)
+  unit          String?  @db.VarChar(50)
+  is_filterable Boolean  @default(false)
+  sort_order    Int      @default(0)
+
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@map("product_specifications")
+}
