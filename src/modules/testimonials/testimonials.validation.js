@@ -78,4 +78,40 @@ function validateListQuery(query) {
   return normalized;
 }
 
-module.exports = { validateListQuery };
+const createTestimonialSchema = Joi.object({
+  product_id: Joi.number().integer().positive().allow(null).optional(),
+  customer_name: Joi.string().max(255).required(),
+  region: Joi.string().max(100).required(),
+  story_type: Joi.string().valid(...STORY_TYPES).required(),
+  content: Joi.string().required(),
+  media_asset_id: Joi.number().integer().positive().allow(null).optional(),
+  is_published: Joi.boolean().default(false),
+});
+
+const updateTestimonialSchema = Joi.object({
+  product_id: Joi.number().integer().positive().allow(null).optional(),
+  customer_name: Joi.string().max(255).optional(),
+  region: Joi.string().max(100).optional(),
+  story_type: Joi.string().valid(...STORY_TYPES).optional(),
+  content: Joi.string().optional(),
+  media_asset_id: Joi.number().integer().positive().allow(null).optional(),
+  is_published: Joi.boolean().optional(),
+});
+
+function validateCreateTestimonial(body) {
+  const { error, value } = createTestimonialSchema.validate(body, { abortEarly: false, stripUnknown: true });
+  if (error) {
+    throw ApiError.validation('Invalid testimonial data', error.details);
+  }
+  return value;
+}
+
+function validateUpdateTestimonial(body) {
+  const { error, value } = updateTestimonialSchema.validate(body, { abortEarly: false, stripUnknown: true });
+  if (error) {
+    throw ApiError.validation('Invalid update data', error.details);
+  }
+  return value;
+}
+
+module.exports = { validateListQuery, validateCreateTestimonial, validateUpdateTestimonial };

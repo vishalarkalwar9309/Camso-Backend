@@ -139,6 +139,17 @@ class ApiError extends Error {
   static conflict(message = 'Resource conflict') {
     return new ApiError(409, 'CONFLICT', message);
   }
+
+  /**
+   * badRequest
+   * USE: 400 Bad Request.
+   * @param {string} message
+   * @param {*} details
+   * @returns {ApiError}
+   */
+  static badRequest(message = 'Bad Request', details = null) {
+    return new ApiError(400, 'BAD_REQUEST', message, details);
+  }
 }
 
 module.exports = ApiError;

@@ -10,8 +10,12 @@
  *   Contains raw SQL for Haversine distance calculation to avoid PostGIS dependency.
  *
  * ELEMENTS:
- *   findNearest — executes raw SQL locator query
- *   findCsrContact — queries active dealers by country
+ *   findNearest       — executes raw SQL locator query
+ *   findCsrContact    — queries active dealers by country
+ *   findAdminDealers  — paginated admin list (all statuses)
+ *   findDealerById    — single dealer by ID
+ *   createDealer      — inserts new dealer row
+ *   updateDealer      — updates dealer fields
  *
  * FINAL OUTPUT:
  *   module.exports = dealersRepository
@@ -21,7 +25,7 @@
  */
 
 const { Prisma } = require('@prisma/client');
-const prisma = require('../../config/database');
+const { prisma } = require('../../config/database');
 
 const dealersRepository = {
   /**
@@ -71,7 +75,78 @@ const dealersRepository = {
         email: true
       }
     });
-  }
+  },
+
+  /**
+   * findAdminDealers
+   *
+   * USE: Returns paginated list of all dealers for admin, filtered by optional params.
+   *
+   * HOW IT WORKS:
+   *   Builds Prisma where clause from filters. Applies parseSort. Runs count + findMany.
+   *
+   * @param {object} filters     — { type, country, is_active }
+   * @param {object} pagination  — { skip, take, sort }
+   * @returns {Promise<{ dealers: Array, total: number }>}
+   */
+  async findAdminDealers(filters, pagination) {
+    const { parseSort } = require('../../core/utils/pagination');
+    // Dealer model has no created_at — sort by id, name, country, city, type, is_active only
+    const ALLOWED_SORT = ['id', 'name', 'country', 'city', 'type', 'is_active'];
+    const where = {};
+    if (filters.type) where.type = filters.type;
+    if (filters.country) where.country = filters.country;
+    if (typeof filters.is_active === 'boolean') where.is_active = filters.is_active;
+
+    const { orderBy } = parseSort(pagination.sort, ALLOWED_SORT, 'id', 'asc');
+    const [total, dealers] = await prisma.$transaction([
+      prisma.dealer.count({ where }),
+      prisma.dealer.findMany({
+        where,
+        skip: pagination.skip,
+        take: pagination.take,
+        orderBy,
+      }),
+    ]);
+    return { total, dealers };
+  },
+
+  /**
+   * findDealerById
+   *
+   * USE: Fetches a single dealer by primary key (admin view, no is_active filter).
+   *
+   * @param {number} id — dealer PK
+   * @returns {Promise<object|null>}
+   */
+  async findDealerById(id) {
+    return prisma.dealer.findUnique({ where: { id } });
+  },
+
+  /**
+   * createDealer
+   *
+   * USE: Inserts a new dealer row into the database.
+   *
+   * @param {object} data — validated dealer fields
+   * @returns {Promise<object>} — created dealer
+   */
+  async createDealer(data) {
+    return prisma.dealer.create({ data });
+  },
+
+  /**
+   * updateDealer
+   *
+   * USE: Updates dealer fields by primary key.
+   *
+   * @param {number} id   — dealer PK
+   * @param {object} data — validated update fields
+   * @returns {Promise<object>} — updated dealer
+   */
+  async updateDealer(id, data) {
+    return prisma.dealer.update({ where: { id }, data });
+  },
 };
 
 module.exports = dealersRepository;

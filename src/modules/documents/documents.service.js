@@ -104,6 +104,121 @@ const documentsService = {
       files: resolvedFiles,
     };
   },
+  async listAdminDocuments(filters, query) {
+    const paginationOptions = parsePagination(query);
+    const [total, records] = await documentsRepository.findAdminDocuments(filters, paginationOptions);
+
+    const documents = await Promise.all(
+      records.map(async (doc) => {
+        const translations = await getTranslations('DOCUMENT', doc.id);
+        return attachTranslations(doc, translations, query.lang || 'en');
+      }),
+    );
+
+    const meta = buildPaginationMeta(paginationOptions.page, paginationOptions.pageSize, total);
+    return { documents, pagination: meta };
+  },
+
+  async getAdminDocumentById(id, lang = 'en') {
+    const doc = await documentsRepository.findAdminDocumentById(id);
+    if (!doc) {
+      throw ApiError.notFound('Document not found.');
+    }
+
+    const translations = await getTranslations('DOCUMENT', doc.id);
+    const localizedDoc = attachTranslations(doc, translations, lang);
+
+    // Admin should likely see all files, but we resolve for the specific lang if provided
+    return { ...localizedDoc, files: doc.files || [] };
+  },
+
+  async createDocument(data, reqAuditContext) {
+    const doc = await documentsRepository.createDocument(data);
+    
+    // Save english fallback title
+    await require('../../core/repositories/translation.repository').upsertFieldTranslations('DOCUMENT', doc.id, {
+      title: { en: data.title }
+    });
+
+    await require('../../core/services/auditService').record({
+      ...reqAuditContext,
+      action: 'CREATE',
+      entityType: 'DOCUMENT',
+      entityId: doc.id,
+      after: data,
+    });
+
+    return doc;
+  },
+
+  async updateDocument(id, data, reqAuditContext) {
+    const existing = await documentsRepository.findAdminDocumentById(id);
+    if (!existing) throw ApiError.notFound('Document not found.');
+
+    const updateData = {};
+    if (data.product_id !== undefined) updateData.product_id = data.product_id;
+    if (data.category_id !== undefined) updateData.category_id = data.category_id;
+    if (data.document_type !== undefined) updateData.document_type = data.document_type;
+    if (data.is_published !== undefined) updateData.is_published = data.is_published;
+
+    const doc = await documentsRepository.updateDocument(id, updateData);
+
+    // Handle translations
+    if (data.translations && data.translations.length > 0) {
+      const fields = {};
+      for (const t of data.translations) {
+        if (!fields[t.field]) fields[t.field] = {};
+        fields[t.field][t.language_code] = t.value;
+      }
+      await require('../../core/repositories/translation.repository').upsertFieldTranslations('DOCUMENT', id, fields);
+    } else if (data.title) {
+      await require('../../core/repositories/translation.repository').upsertFieldTranslations('DOCUMENT', id, {
+        title: { en: data.title }
+      });
+    }
+
+    if (data.is_published !== undefined && existing.is_published !== data.is_published) {
+      await require('../../core/services/auditService').record({
+        ...reqAuditContext,
+        action: data.is_published ? 'PUBLISH' : 'UNPUBLISH',
+        entityType: 'DOCUMENT',
+        entityId: id,
+        before: { is_published: existing.is_published },
+        after: { is_published: data.is_published },
+      });
+    }
+
+    await require('../../core/services/auditService').record({
+      ...reqAuditContext,
+      action: 'UPDATE',
+      entityType: 'DOCUMENT',
+      entityId: id,
+      before: existing,
+      after: updateData,
+    });
+
+    return doc;
+  },
+
+  async uploadDocumentFile(id, file, languageCode, adminUserId, reqAuditContext) {
+    const existing = await documentsRepository.findAdminDocumentById(id);
+    if (!existing) throw ApiError.notFound('Document not found.');
+
+    const { uploadToFirebase } = require('../../core/utils/mediaUpload');
+    const mediaAsset = await uploadToFirebase(file, adminUserId, undefined, 'documents');
+
+    const docFile = await documentsRepository.addDocumentFile(id, languageCode, mediaAsset.id);
+
+    await require('../../core/services/auditService').record({
+      ...reqAuditContext,
+      action: 'UPDATE',
+      entityType: 'DOCUMENT_FILE',
+      entityId: docFile.id,
+      after: { language_code: languageCode, media_asset_id: mediaAsset.id },
+    });
+
+    return docFile;
+  },
 };
 
 module.exports = documentsService;

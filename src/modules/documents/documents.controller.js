@@ -79,6 +79,49 @@ const documentsController = {
 
     return ApiResponse.success(res, document);
   },
+  async adminList(req, res) {
+    const validatedQuery = require('./documents.validation').validateListQuery(req.query);
+    const { product_id, category_id, document_type, lang } = validatedQuery;
+    let is_published = undefined;
+    if (req.query.is_published === 'true') is_published = true;
+    else if (req.query.is_published === 'false') is_published = false;
+
+    const filters = { product_id, category_id, document_type, is_published };
+    const { documents, pagination } = await documentsService.listAdminDocuments(filters, { ...req.query, lang });
+
+    return ApiResponse.paginated(res, documents, pagination);
+  },
+
+  async adminGetById(req, res) {
+    const { id, lang } = require('./documents.validation').validateDetailParams(req.params, req.query);
+    const document = await documentsService.getAdminDocumentById(id, lang);
+    return ApiResponse.success(res, document);
+  },
+
+  async adminCreate(req, res) {
+    const data = require('./documents.validation').validateCreateDocument(req.body);
+    const document = await documentsService.createDocument(data, req.auditContext);
+    return ApiResponse.success(res, document, 201);
+  },
+
+  async adminUpdate(req, res) {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    const data = require('./documents.validation').validateUpdateDocument(req.body);
+    
+    const document = await documentsService.updateDocument(id, data, req.auditContext);
+    return ApiResponse.success(res, document);
+  },
+
+  async adminUploadFile(req, res) {
+    const id = parseInt(req.params.id, 10);
+    const languageCode = req.body.language_code || 'en';
+    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    if (!req.file) throw require('../../core/utils/ApiError').validation('No file uploaded');
+
+    const docFile = await documentsService.uploadDocumentFile(id, req.file, languageCode, req.admin.id, req.auditContext);
+    return ApiResponse.success(res, docFile, 201);
+  },
 };
 
 module.exports = documentsController;

@@ -20,13 +20,9 @@
 
 const request = require('supertest');
 const { createApp } = require('../../src/app');
+const app = createApp();
 
 describe('Health & Readiness Integration Tests', () => {
-  let app;
-
-  beforeAll(() => {
-    app = createApp();
-  });
 
   test('GET /api/v1/health returns 200 with ok status', async () => {
     const res = await request(app).get('/api/v1/health');

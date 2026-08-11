@@ -117,4 +117,43 @@ function validateDetailParams(params, query) {
   return { id: paramsResult.value.id, lang: queryResult.value.lang };
 }
 
-module.exports = { validateListQuery, validateDetailParams };
+const createDocumentSchema = Joi.object({
+  product_id: Joi.number().integer().positive().allow(null).optional(),
+  category_id: Joi.number().integer().positive().allow(null).optional(),
+  document_type: Joi.string().valid(...DOCUMENT_TYPES).required(),
+  is_published: Joi.boolean().default(false),
+  title: Joi.string().max(255).required(), // English fallback title initially
+});
+
+const updateDocumentSchema = Joi.object({
+  product_id: Joi.number().integer().positive().allow(null).optional(),
+  category_id: Joi.number().integer().positive().allow(null).optional(),
+  document_type: Joi.string().valid(...DOCUMENT_TYPES).optional(),
+  is_published: Joi.boolean().optional(),
+  title: Joi.string().max(255).optional(), // Default language title update
+  translations: Joi.array().items(
+    Joi.object({
+      language_code: Joi.string().max(10).required(),
+      field: Joi.string().valid('title').required(),
+      value: Joi.string().required(),
+    })
+  ).optional(),
+});
+
+function validateCreateDocument(body) {
+  const { error, value } = createDocumentSchema.validate(body, { abortEarly: false, stripUnknown: true });
+  if (error) {
+    throw ApiError.validation('Invalid document data', error.details);
+  }
+  return value;
+}
+
+function validateUpdateDocument(body) {
+  const { error, value } = updateDocumentSchema.validate(body, { abortEarly: false, stripUnknown: true });
+  if (error) {
+    throw ApiError.validation('Invalid update data', error.details);
+  }
+  return value;
+}
+
+module.exports = { validateListQuery, validateDetailParams, validateCreateDocument, validateUpdateDocument };

@@ -65,4 +65,45 @@ function validateListQuery(query) {
   return normalized;
 }
 
-module.exports = { validateListQuery };
+const createFaqSchema = Joi.object({
+  product_id: Joi.number().integer().positive().allow(null).optional(),
+  category: Joi.string().valid(...FAQ_CATEGORIES).required(),
+  sort_order: Joi.number().integer().default(0),
+  is_published: Joi.boolean().default(false),
+  question: Joi.string().required(), // English fallback question initially
+  answer: Joi.string().required(),   // English fallback answer initially
+});
+
+const updateFaqSchema = Joi.object({
+  product_id: Joi.number().integer().positive().allow(null).optional(),
+  category: Joi.string().valid(...FAQ_CATEGORIES).optional(),
+  sort_order: Joi.number().integer().optional(),
+  is_published: Joi.boolean().optional(),
+  question: Joi.string().optional(),
+  answer: Joi.string().optional(),
+  translations: Joi.array().items(
+    Joi.object({
+      language_code: Joi.string().max(10).required(),
+      field: Joi.string().valid('question', 'answer').required(),
+      value: Joi.string().required(),
+    })
+  ).optional(),
+});
+
+function validateCreateFaq(body) {
+  const { error, value } = createFaqSchema.validate(body, { abortEarly: false, stripUnknown: true });
+  if (error) {
+    throw ApiError.validation('Invalid FAQ data', error.details);
+  }
+  return value;
+}
+
+function validateUpdateFaq(body) {
+  const { error, value } = updateFaqSchema.validate(body, { abortEarly: false, stripUnknown: true });
+  if (error) {
+    throw ApiError.validation('Invalid update data', error.details);
+  }
+  return value;
+}
+
+module.exports = { validateListQuery, validateCreateFaq, validateUpdateFaq };

@@ -24,6 +24,7 @@
 
 const request = require('supertest');
 const { createApp } = require('../../src/app');
+const app = createApp();
 const documentsRepository = require('../../src/modules/documents/documents.repository');
 const testimonialsRepository = require('../../src/modules/testimonials/testimonials.repository');
 const faqsRepository = require('../../src/modules/faqs/faqs.repository');

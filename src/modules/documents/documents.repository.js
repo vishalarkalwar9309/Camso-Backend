@@ -129,6 +129,104 @@ const documentsRepository = {
       },
     });
   },
+  async findAdminDocuments(filters, pagination, prismaClient = prisma) {
+    const where = {};
+    if (filters.product_id) where.product_id = filters.product_id;
+    if (filters.category_id) where.category_id = filters.category_id;
+    if (filters.document_type) where.document_type = filters.document_type;
+    if (typeof filters.is_published === 'boolean') where.is_published = filters.is_published;
+
+    const { orderBy } = parseSort(pagination.sort, ALLOWED_SORT_FIELDS, 'created_at', 'desc');
+
+    return prismaClient.$transaction([
+      prismaClient.document.count({ where }),
+      prismaClient.document.findMany({
+        where,
+        skip: pagination.skip,
+        take: pagination.take,
+        orderBy,
+        select: {
+          id: true,
+          product_id: true,
+          category_id: true,
+          document_type: true,
+          is_published: true,
+          created_at: true,
+          updated_at: true,
+        },
+      }),
+    ]);
+  },
+
+  async findAdminDocumentById(id, prismaClient = prisma) {
+    return prismaClient.document.findFirst({
+      where: { id },
+      select: {
+        id: true,
+        product_id: true,
+        category_id: true,
+        document_type: true,
+        is_published: true,
+        created_at: true,
+        updated_at: true,
+        files: {
+          select: {
+            id: true,
+            language_code: true,
+            is_offline_downloadable: true,
+            media_asset: {
+              select: {
+                id: true,
+                url: true,
+                filename: true,
+                mime_type: true,
+                size_bytes: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  },
+
+  async createDocument(data, prismaClient = prisma) {
+    return prismaClient.document.create({
+      data: {
+        product_id: data.product_id,
+        category_id: data.category_id,
+        document_type: data.document_type,
+        is_published: data.is_published,
+      },
+    });
+  },
+
+  async updateDocument(id, data, prismaClient = prisma) {
+    return prismaClient.document.update({
+      where: { id },
+      data,
+    });
+  },
+
+  async addDocumentFile(documentId, languageCode, mediaAssetId, isOfflineDownloadable = false, prismaClient = prisma) {
+    return prismaClient.documentFile.upsert({
+      where: {
+        document_id_language_code: {
+          document_id: documentId,
+          language_code: languageCode,
+        },
+      },
+      update: {
+        media_asset_id: mediaAssetId,
+        is_offline_downloadable: isOfflineDownloadable,
+      },
+      create: {
+        document_id: documentId,
+        language_code: languageCode,
+        media_asset_id: mediaAssetId,
+        is_offline_downloadable: isOfflineDownloadable,
+      },
+    });
+  },
 };
 
 module.exports = documentsRepository;

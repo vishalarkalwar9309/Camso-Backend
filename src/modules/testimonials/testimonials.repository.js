@@ -89,6 +89,93 @@ const testimonialsRepository = {
       }),
     ]);
   },
+  async findAdminTestimonials(filters, pagination, prismaClient = prisma) {
+    const where = {};
+    if (filters.product_id) where.product_id = filters.product_id;
+    if (filters.story_type) where.story_type = filters.story_type;
+    if (typeof filters.is_published === 'boolean') where.is_published = filters.is_published;
+
+    const { orderBy } = parseSort(pagination.sort, ALLOWED_SORT_FIELDS, 'created_at', 'desc');
+
+    return prismaClient.$transaction([
+      prismaClient.testimonial.count({ where }),
+      prismaClient.testimonial.findMany({
+        where,
+        skip: pagination.skip,
+        take: pagination.take,
+        orderBy,
+        select: {
+          id: true,
+          product_id: true,
+          customer_name: true,
+          region: true,
+          story_type: true,
+          content: true,
+          media_asset_id: true,
+          is_published: true,
+          created_at: true,
+          updated_at: true,
+          media_asset: {
+            select: {
+              id: true,
+              url: true,
+              filename: true,
+              mime_type: true,
+              size_bytes: true,
+            },
+          },
+        },
+      }),
+    ]);
+  },
+
+  async findAdminTestimonialById(id, prismaClient = prisma) {
+    return prismaClient.testimonial.findFirst({
+      where: { id },
+      select: {
+        id: true,
+        product_id: true,
+        customer_name: true,
+        region: true,
+        story_type: true,
+        content: true,
+        media_asset_id: true,
+        is_published: true,
+        created_at: true,
+        updated_at: true,
+        media_asset: {
+          select: {
+            id: true,
+            url: true,
+            filename: true,
+            mime_type: true,
+            size_bytes: true,
+          },
+        },
+      },
+    });
+  },
+
+  async createTestimonial(data, prismaClient = prisma) {
+    return prismaClient.testimonial.create({
+      data: {
+        product_id: data.product_id,
+        customer_name: data.customer_name,
+        region: data.region,
+        story_type: data.story_type,
+        content: data.content,
+        media_asset_id: data.media_asset_id,
+        is_published: data.is_published,
+      },
+    });
+  },
+
+  async updateTestimonial(id, data, prismaClient = prisma) {
+    return prismaClient.testimonial.update({
+      where: { id },
+      data,
+    });
+  },
 };
 
 module.exports = testimonialsRepository;

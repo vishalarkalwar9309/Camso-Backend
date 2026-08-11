@@ -78,6 +78,66 @@ const faqsRepository = {
       }),
     ]);
   },
+  async findAdminFaqs(filters, pagination, prismaClient = prisma) {
+    const where = {};
+    if (filters.category) where.category = filters.category;
+    if (filters.product_id) where.product_id = filters.product_id;
+    if (typeof filters.is_published === 'boolean') where.is_published = filters.is_published;
+
+    const { orderBy } = parseSort(pagination.sort, ALLOWED_SORT_FIELDS, 'sort_order', 'asc');
+
+    return prismaClient.$transaction([
+      prismaClient.faq.count({ where }),
+      prismaClient.faq.findMany({
+        where,
+        skip: pagination.skip,
+        take: pagination.take,
+        orderBy,
+        select: {
+          id: true,
+          product_id: true,
+          category: true,
+          sort_order: true,
+          is_published: true,
+          created_at: true,
+          updated_at: true,
+        },
+      }),
+    ]);
+  },
+
+  async findAdminFaqById(id, prismaClient = prisma) {
+    return prismaClient.faq.findFirst({
+      where: { id },
+      select: {
+        id: true,
+        product_id: true,
+        category: true,
+        sort_order: true,
+        is_published: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+  },
+
+  async createFaq(data, prismaClient = prisma) {
+    return prismaClient.faq.create({
+      data: {
+        product_id: data.product_id,
+        category: data.category,
+        sort_order: data.sort_order,
+        is_published: data.is_published,
+      },
+    });
+  },
+
+  async updateFaq(id, data, prismaClient = prisma) {
+    return prismaClient.faq.update({
+      where: { id },
+      data,
+    });
+  },
 };
 
 module.exports = faqsRepository;

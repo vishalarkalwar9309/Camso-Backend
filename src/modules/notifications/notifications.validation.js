@@ -23,7 +23,7 @@ const Joi = require('joi');
 
 const listFeedSchema = Joi.object({
   page: Joi.number().integer().min(1).optional(),
-  pageSize: Joi.number().integer().min(1).max(100).optional(),
+  pageSize: Joi.number().integer().min(1).optional(),
   sort: Joi.string().optional(),
   lang: Joi.string().trim().min(2).max(10).optional()
 });

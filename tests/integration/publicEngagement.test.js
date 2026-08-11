@@ -1,6 +1,7 @@
 const request = require('supertest');
-const app = require('../../src/app');
-const prisma = require('../../src/config/database');
+const { createApp } = require('../../src/app');
+const app = createApp();
+const { prisma } = require('../../src/config/database');
 const tokenService = require('../../src/core/utils/tokenService');
 
 describe('Public Engagement Endpoints (Dealers, Feedback, Notifications)', () => {

@@ -53,6 +53,41 @@ const testimonialsController = {
 
     return ApiResponse.paginated(res, testimonials, pagination);
   },
+  async adminList(req, res) {
+    const validatedQuery = require('./testimonials.validation').validateListQuery(req.query);
+    const { product_id, story_type } = validatedQuery;
+    let is_published = undefined;
+    if (req.query.is_published === 'true') is_published = true;
+    else if (req.query.is_published === 'false') is_published = false;
+
+    const filters = { product_id, story_type, is_published };
+    const { testimonials, pagination } = await testimonialsService.listAdminTestimonials(filters, req.query);
+
+    return ApiResponse.paginated(res, testimonials, pagination);
+  },
+
+  async adminGetById(req, res) {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    
+    const testimonial = await testimonialsService.getAdminTestimonialById(id);
+    return ApiResponse.success(res, testimonial);
+  },
+
+  async adminCreate(req, res) {
+    const data = require('./testimonials.validation').validateCreateTestimonial(req.body);
+    const testimonial = await testimonialsService.createTestimonial(data, req.auditContext);
+    return ApiResponse.success(res, testimonial, 201);
+  },
+
+  async adminUpdate(req, res) {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    const data = require('./testimonials.validation').validateUpdateTestimonial(req.body);
+    
+    const testimonial = await testimonialsService.updateTestimonial(id, data, req.auditContext);
+    return ApiResponse.success(res, testimonial);
+  },
 };
 
 module.exports = testimonialsController;

@@ -53,6 +53,42 @@ const faqsController = {
 
     return ApiResponse.paginated(res, faqs, pagination);
   },
+  async adminList(req, res) {
+    const validatedQuery = require('./faqs.validation').validateListQuery(req.query);
+    const { category, product_id, lang } = validatedQuery;
+    let is_published = undefined;
+    if (req.query.is_published === 'true') is_published = true;
+    else if (req.query.is_published === 'false') is_published = false;
+
+    const filters = { category, product_id, is_published };
+    const { faqs, pagination } = await faqsService.listAdminFaqs(filters, { ...req.query, lang });
+
+    return ApiResponse.paginated(res, faqs, pagination);
+  },
+
+  async adminGetById(req, res) {
+    const id = parseInt(req.params.id, 10);
+    const lang = req.query.lang || 'en';
+    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    
+    const faq = await faqsService.getAdminFaqById(id, lang);
+    return ApiResponse.success(res, faq);
+  },
+
+  async adminCreate(req, res) {
+    const data = require('./faqs.validation').validateCreateFaq(req.body);
+    const faq = await faqsService.createFaq(data, req.auditContext);
+    return ApiResponse.success(res, faq, 201);
+  },
+
+  async adminUpdate(req, res) {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    const data = require('./faqs.validation').validateUpdateFaq(req.body);
+    
+    const faq = await faqsService.updateFaq(id, data, req.auditContext);
+    return ApiResponse.success(res, faq);
+  },
 };
 
 module.exports = faqsController;
