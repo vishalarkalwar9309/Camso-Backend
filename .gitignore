@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Environment — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Build / coverage
+dist/
+coverage/
+
+# Local uploads (file storage goes through Firebase Storage in production)
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# NOTE: prisma/migrations/ is intentionally NOT ignored.
+# Migration files must be tracked in version control.

@@ -1,0 +1,145 @@
+// =============================================================================
+// CAMSO Backend — Prisma Schema
+// Phase 2: Authentication Foundation
+//
+// Scope: users, refresh_tokens, user_devices
+// Deferred to later phases:
+//   - admin_users, admin_user_id FK on refresh_tokens  (Aary / Phase 10)
+//   - business_type enum                               (Phase 4, pending CEAT confirmation)
+//   - product, category, search, bookmark, feedback    (Phases 6–9)
+//   - languages, translations, media_assets            (shared — later phase)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// Platform: mobile device operating system.
+// Only two values are in scope for Launch 1.
+enum Platform {
+  ANDROID
+  IOS
+}
+
+// =============================================================================
+// Models
+// =============================================================================
+
+// User
+// ----
+// Represents both guest users (no credentials) and registered users.
+//
+// Guest users:      is_guest = true,  email = null, password_hash = null
+// Registered users: is_guest = false, email = set,  password_hash = set
+//
+// email and phone are both nullable because guests have neither.
+// PostgreSQL treats each NULL as distinct, so multiple NULL emails do not
+// violate the unique constraint — this is intentional and correct.
+//
+// password_hash stores a bcrypt hash only. Plaintext passwords are never stored.
+//
+// preferred_language is a plain string (ISO 639-1 code, e.g. "en").
+// It is not a FK to a languages table — that table is not in scope for this phase.
+//
+// DEFERRED:
+//   - business_type enum (pending CEAT confirmation of exact values; added in Phase 4)
+model User {
+  id                 String    @id @default(cuid())
+  email              String?   @unique
+  phone              String?   @unique
+  password_hash      String?
+  display_name       String?
+  is_guest           Boolean   @default(true)
+  preferred_language String    @default("en")
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  // Relations
+  refresh_tokens RefreshToken[]
+  devices        UserDevice[]
+
+  @@index([created_at])
+  @@map("users")
+}
+
+// RefreshToken
+// ------------
+// Stores hashed refresh tokens for the rotation/revocation mechanism.
+//
+// The raw opaque token is returned to the client once and NEVER persisted.
+// token_hash stores SHA-256(rawToken). On each refresh request, the service
+// hashes the incoming token and looks it up here.
+//
+// Rotation: on a successful refresh, revoked_at is set on the old token
+// and a new token row is inserted. The old row is kept for audit purposes
+// and cleaned up by a background job (future phase).
+//
+// user_id is NON-NULLABLE:
+//   This phase covers mobile-user authentication only. Every refresh token
+//   issued in this system belongs to a User. Admin authentication is out of
+//   scope for this phase and must not be anticipated by making this nullable.
+//   When admin auth is added (Phase 10), a separate admin_refresh_tokens table
+//   or a migration adding admin_user_id will be evaluated at that time.
+//
+// device_id is a plain String? (not a FK):
+//   Informational association. A token can exist for a device_id that does
+//   not yet have a UserDevice row (edge case in the guest registration flow).
+model RefreshToken {
+  id         String    @id @default(cuid())
+  user_id    String
+  token_hash String    @unique
+  expires_at DateTime
+  revoked_at DateTime?
+  device_id  String?
+  created_at DateTime  @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("refresh_tokens")
+}
+
+// UserDevice
+// ----------
+// Tracks devices associated with users or guests.
+//
+// user_id is nullable: a device is registered by the client before a user
+// account exists (guest flow). It is linked to a user on registration or login.
+//
+// device_id is a client-supplied opaque identifier unique to the device.
+//
+// fcm_token is nullable: Firebase Cloud Messaging credentials are not yet
+// available from CEAT. The column is present so no schema migration is needed
+// when Firebase is activated. FCM integration is a future phase.
+//
+// onDelete: SetNull — if a user is deleted, user_id becomes null but the
+// device record is preserved (useful for analytics continuity).
+model UserDevice {
+  id           String    @id @default(cuid())
+  user_id      String?
+  device_id    String    @unique
+  platform     Platform
+  app_version  String?
+  fcm_token    String?
+  is_active    Boolean   @default(true)
+  last_seen_at DateTime  @default(now())
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  // Relations
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@map("user_devices")
+}
