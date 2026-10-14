@@ -46,4 +46,32 @@ function sendError(res, apiError) {
   });
 }
 
-module.exports = { sendSuccess, sendError };
+/**
+ * ApiResponse class providing static methods matching Aary's convention.
+ */
+class ApiResponse {
+  static success(res, data = null, statusCode = 200, meta = undefined) {
+    return sendSuccess(res, data, statusCode, meta);
+  }
+
+  static paginated(res, data, pagination, statusCode = 200) {
+    const meta = {
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      total: pagination.total,
+      totalPages: pagination.totalPages,
+    };
+    return sendSuccess(res, data, statusCode, meta);
+  }
+}
+
+ApiResponse.sendSuccess = sendSuccess;
+ApiResponse.sendError = sendError;
+ApiResponse.success = ApiResponse.success;
+ApiResponse.paginated = ApiResponse.paginated;
+
+module.exports = ApiResponse;
+module.exports.sendSuccess = sendSuccess;
+module.exports.sendError = sendError;
+module.exports.success = ApiResponse.success;
+module.exports.paginated = ApiResponse.paginated;

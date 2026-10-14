@@ -3,24 +3,25 @@
 /**
  * src/modules/notifications/notifications.service.js
  *
- * FCM Push Notification & Campaign Dispatch Service.
- *
- * Resolves recipient device tokens from `user_devices` based on targeting rules,
- * batches and delivers via `fcmService.sendMulticastNotification()`,
- * logs to audit trail, and returns execution metrics.
+ * FCM Push Notification & Campaign Dispatch Service + Public & Admin Notification Feed.
  */
 
 const prisma = require('../../config/database');
 const fcmService = require('../../core/services/fcmService');
 const auditService = require('../../core/services/auditService');
 const ApiError = require('../../core/utils/ApiError');
+const notificationsRepository = require('./notifications.repository');
+const {
+  getManyTranslations,
+  attachManyTranslations,
+  getTranslations,
+  attachTranslations,
+  upsertTranslations,
+} = require('../../core/utils/translate');
+const { buildPaginationMeta, parsePagination } = require('../../core/utils/pagination');
 
 /**
  * Resolves active device tokens matching the target strategy.
- *
- * @param {string} targetType - 'ALL_USERS' | 'PLATFORM' | 'LANGUAGE'
- * @param {string|null} targetValue - e.g. 'ANDROID', 'IOS', 'en', 'fr'
- * @returns {Promise<string[]>}
  */
 async function resolveTargetTokens(targetType = 'ALL_USERS', targetValue = null) {
   const where = {
@@ -49,15 +50,6 @@ async function resolveTargetTokens(targetType = 'ALL_USERS', targetValue = null)
 
 /**
  * Dispatches a push notification broadcast to target devices.
- *
- * @param {object} params
- * @param {string} params.title - Notification title
- * @param {string} [params.body] - Notification body
- * @param {string} [params.target_type='ALL_USERS'] - Targeting strategy
- * @param {string} [params.target_value] - Target filter value
- * @param {object} [params.data={}] - Custom data payload
- * @param {object} actor - Admin caller ({ id, email, role })
- * @returns {Promise<{ targetCount: number, successCount: number, failureCount: number, is_mock: boolean }>}
  */
 async function dispatchNotification({
   title,
@@ -108,7 +100,148 @@ async function dispatchNotification({
   };
 }
 
-module.exports = {
+/**
+ * Fetches paginated public notification feed and attaches translated fields.
+ */
+async function getPublicFeed(query = {}) {
+  const { total, data, page, pageSize } = await notificationsRepository.findPublicFeed(query);
+
+  if (data.length > 0) {
+    const entityIds = data.map((n) => n.id);
+    const translations = await getManyTranslations('NOTIFICATION', entityIds);
+    const translatedData = attachManyTranslations(data, translations, query.lang || 'en');
+
+    return {
+      data: translatedData,
+      meta: buildPaginationMeta(page, pageSize, total),
+    };
+  }
+
+  return {
+    data: [],
+    meta: buildPaginationMeta(page, pageSize, total),
+  };
+}
+
+/**
+ * Returns paginated notifications for admin view.
+ */
+async function adminListNotifications(query = {}) {
+  const { page, pageSize, skip, take, sort } = parsePagination(query);
+  const filters = {};
+  if (query.notification_type) filters.notification_type = query.notification_type;
+  if (query.status) filters.status = query.status;
+  if (query.product_id) filters.product_id = String(query.product_id);
+  if (query.campaign_id) filters.campaign_id = String(query.campaign_id);
+
+  const { total, data } = await notificationsRepository.findAdminNotifications(filters, { skip, take, sort });
+  const lang = query.lang || 'en';
+  if (data.length > 0) {
+    const entityIds = data.map((n) => n.id);
+    const translations = await getManyTranslations('NOTIFICATION', entityIds);
+    const translatedData = attachManyTranslations(data, translations, lang);
+    return { data: translatedData, pagination: buildPaginationMeta(page, pageSize, total) };
+  }
+  return { data: [], pagination: buildPaginationMeta(page, pageSize, total) };
+}
+
+/**
+ * Returns a single notification by ID for admin.
+ */
+async function adminGetNotificationById(id, lang = 'en') {
+  const notification = await notificationsRepository.findAdminNotificationById(id);
+  if (!notification) throw ApiError.notFound(`Notification with ID ${id} not found.`);
+  const translations = await getTranslations('NOTIFICATION', id);
+  return attachTranslations(notification, translations, lang);
+}
+
+/**
+ * Creates a new notification record.
+ */
+async function adminCreateNotification(body, adminId, auditContext = {}) {
+  const { notification_type, product_id, campaign_id, translations } = body;
+  if (!notification_type) throw ApiError.validation('notification_type is required.');
+
+  const notification = await notificationsRepository.createNotification({
+    notification_type,
+    product_id: product_id ? String(product_id) : null,
+    campaign_id: campaign_id ? String(campaign_id) : null,
+    created_by: adminId ? String(adminId) : null,
+    status: 'DRAFT',
+  });
+
+  if (translations && Array.isArray(translations) && translations.length > 0) {
+    const fields = {};
+    for (const t of translations) {
+      if (t.field && t.language_code && t.value !== undefined) {
+        if (!fields[t.field]) fields[t.field] = {};
+        fields[t.field][t.language_code] = t.value;
+      }
+    }
+    await upsertTranslations('NOTIFICATION', notification.id, fields);
+  }
+
+  await auditService.record({
+    actorId: auditContext.actorId || adminId,
+    action: 'CREATE',
+    entityType: 'NOTIFICATION',
+    entityId: notification.id,
+    before: null,
+    after: notification,
+    ip: auditContext.ip,
+    userAgent: auditContext.userAgent,
+  });
+
+  return notification;
+}
+
+/**
+ * Updates notification fields and/or translations.
+ */
+async function adminUpdateNotification(id, body, auditContext = {}) {
+  const before = await notificationsRepository.findAdminNotificationById(id);
+  if (!before) throw ApiError.notFound(`Notification with ID ${id} not found.`);
+
+  const { translations, ...updateFields } = body;
+  let after = before;
+
+  if (Object.keys(updateFields).length > 0) {
+    after = await notificationsRepository.updateNotification(id, updateFields);
+  }
+
+  if (translations && Array.isArray(translations) && translations.length > 0) {
+    const fields = {};
+    for (const t of translations) {
+      if (t.field && t.language_code && t.value !== undefined) {
+        if (!fields[t.field]) fields[t.field] = {};
+        fields[t.field][t.language_code] = t.value;
+      }
+    }
+    await upsertTranslations('NOTIFICATION', id, fields);
+  }
+
+  await auditService.record({
+    actorId: auditContext.actorId,
+    action: 'UPDATE',
+    entityType: 'NOTIFICATION',
+    entityId: id,
+    before,
+    after,
+    ip: auditContext.ip,
+    userAgent: auditContext.userAgent,
+  });
+
+  return after;
+}
+
+const notificationsService = {
   resolveTargetTokens,
   dispatchNotification,
+  getPublicFeed,
+  adminListNotifications,
+  adminGetNotificationById,
+  adminCreateNotification,
+  adminUpdateNotification,
 };
+
+module.exports = notificationsService;

@@ -71,6 +71,38 @@ describe('Business Auth Service (Unit Tests)', () => {
       expect(res.user.status).toBe('PENDING');
       expect(res.user).not.toHaveProperty('password_hash');
     });
+
+    it('successfully registers OEM_PARTNER organization in PENDING status', async () => {
+      repo.findBusinessUserByEmail.mockResolvedValue(null);
+      repo.registerBusinessOrganization.mockResolvedValue({
+        organization: {
+          id: 'org-oem-1',
+          name: 'Caterpillar OEM Engineering',
+          type: 'OEM_PARTNER',
+          approval_status: 'PENDING',
+          is_active: false,
+          country: 'US',
+        },
+        user: {
+          id: 'buser-oem-1',
+          organization_id: 'org-oem-1',
+          email: 'lead.engineer@cat.com',
+          role: 'OEM_PARTNER',
+          status: 'PENDING',
+          created_at: new Date(),
+        },
+      });
+
+      const res = await service.register({
+        organization: { name: 'Caterpillar OEM Engineering', type: 'OEM_PARTNER' },
+        user: { email: 'lead.engineer@cat.com', password: 'Password123!' },
+      });
+
+      expect(res.organization.type).toBe('OEM_PARTNER');
+      expect(res.user.role).toBe('OEM_PARTNER');
+      expect(res.organization.approval_status).toBe('PENDING');
+      expect(res.user.status).toBe('PENDING');
+    });
   });
 
   describe('login', () => {
@@ -179,6 +211,34 @@ describe('Business Auth Service (Unit Tests)', () => {
       expect(res.user.role).toBe('DEALER');
       expect(res.user.organization_id).toBe('org-metro-777');
       expect(res.organization.id).toBe('org-metro-777');
+    });
+
+    it('successfully logs in approved OEM partner and issues token with OEM_PARTNER role and organization_id', async () => {
+      repo.findBusinessUserByEmail.mockResolvedValue({
+        id: 'oem-user-123',
+        email: 'lead.engineer@cat.com',
+        password_hash: sampleHash,
+        display_name: 'Lead OEM Engineer',
+        role: 'OEM_PARTNER',
+        status: 'ACTIVE',
+        organization_id: 'org-cat-888',
+        organization: {
+          id: 'org-cat-888',
+          name: 'Caterpillar OEM Inc',
+          type: 'OEM_PARTNER',
+          approval_status: 'APPROVED',
+          is_active: true,
+        },
+      });
+      repo.createBusinessRefreshToken.mockResolvedValue({});
+
+      const res = await service.login({ email: 'lead.engineer@cat.com', password: 'DealerPass123!' });
+
+      expect(res.tokens).toHaveProperty('access_token');
+      expect(res.tokens).toHaveProperty('refresh_token');
+      expect(res.user.role).toBe('OEM_PARTNER');
+      expect(res.user.organization_id).toBe('org-cat-888');
+      expect(res.organization.type).toBe('OEM_PARTNER');
     });
   });
 

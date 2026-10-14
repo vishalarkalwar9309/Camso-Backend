@@ -50,9 +50,10 @@ function parseDurationMs(str) {
  * @param {{ sub: string, is_guest: boolean }} payload
  * @returns {string} signed JWT
  */
-function generateAccessToken({ sub, is_guest }) {
+function generateAccessToken({ sub, is_guest, role }) {
+  const tokenRole = role || (is_guest ? 'GUEST' : 'END_USER');
   return jwt.sign(
-    { sub, is_guest },
+    { sub, is_guest, role: tokenRole, type: tokenRole },
     jwtConfig.accessSecret,
     { expiresIn: jwtConfig.accessExpiresIn }
   );
@@ -134,13 +135,38 @@ function generateBusinessAccessToken({ sub, email, role, org_id }) {
   );
 }
 
+/**
+ * Issues an access + refresh token pair for a principal.
+ * Compatible with Aary's integration test fixtures and admin token generation.
+ *
+ * @param {object} payload - e.g. { id, role, type: 'ADMIN' }
+ * @returns {{ accessToken: string, refreshToken: string, refreshExpiresAt: Date }}
+ */
+function generateTokenPair(payload = {}) {
+  const sub = payload.sub || (payload.id !== undefined && payload.id !== null ? String(payload.id) : null);
+  const tokenPayload = {
+    ...payload,
+    sub,
+    id: payload.id !== undefined ? payload.id : sub,
+  };
+  const accessToken = jwt.sign(tokenPayload, jwtConfig.accessSecret, {
+    expiresIn: jwtConfig.accessExpiresIn,
+  });
+  const refreshToken = crypto.randomBytes(64).toString('hex');
+  const refreshExpiresAt = new Date();
+  refreshExpiresAt.setDate(refreshExpiresAt.getDate() + 30);
+  return { accessToken, refreshToken, refreshExpiresAt };
+}
+
 module.exports = {
   generateAccessToken,
   generateAdminAccessToken,
   generateBusinessAccessToken,
+  generateTokenPair,
   verifyAccessToken,
   generateRawRefreshToken,
   hashRefreshToken,
   buildRefreshTokenExpiry,
 };
+
 

@@ -17,4 +17,10 @@ const prisma = new PrismaClient({
     : ['warn', 'error'],
 });
 
+prisma.prisma = prisma;
+prisma.connectDB = async () => {
+  await prisma.$queryRaw`SELECT 1`;
+  return prisma;
+};
+
 module.exports = prisma;

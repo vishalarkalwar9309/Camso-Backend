@@ -90,6 +90,24 @@ describe('businessGuard & requireBusinessRole Middleware (Unit Tests)', () => {
       expect(req.businessUser.role).toBe('DISTRIBUTOR');
       expect(req.businessUser.organization_id).toBe('org-dist-202');
     });
+
+    it('accepts valid OEM_PARTNER business token and populates req.businessUser', () => {
+      const oemToken = generateBusinessAccessToken({
+        sub: 'oem-user-1',
+        email: 'oem@caterpillar.com',
+        role: 'OEM_PARTNER',
+        org_id: 'org-oem-303',
+      });
+      const req = { headers: { authorization: `Bearer ${oemToken}` } };
+      const res = {};
+      const next = jest.fn();
+
+      businessGuard(req, res, next);
+
+      expect(next).toHaveBeenCalledWith();
+      expect(req.businessUser.role).toBe('OEM_PARTNER');
+      expect(req.businessUser.organization_id).toBe('org-oem-303');
+    });
   });
 
   describe('requireBusinessRole', () => {
@@ -139,6 +157,32 @@ describe('businessGuard & requireBusinessRole Middleware (Unit Tests)', () => {
       expect(next).toHaveBeenCalledWith(expect.any(ApiError));
       expect(next.mock.calls[0][0].statusCode).toBe(403);
       expect(next.mock.calls[0][0].message).toMatch(/restricted to DISTRIBUTOR/i);
+    });
+
+    it('allows OEM_PARTNER to access OEM_PARTNER-protected endpoint', () => {
+      const middleware = requireBusinessRole('OEM_PARTNER');
+      const req = { businessUser: { role: 'OEM_PARTNER', organization_id: 'org-oem' } };
+      const res = {};
+      const next = jest.fn();
+
+      middleware(req, res, next);
+
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it('denies DEALER or DISTRIBUTOR from accessing OEM_PARTNER-protected endpoint (403 Forbidden)', () => {
+      const middleware = requireBusinessRole('OEM_PARTNER');
+      const reqDealer = { businessUser: { role: 'DEALER', organization_id: 'org-1' } };
+      const nextDealer = jest.fn();
+      middleware(reqDealer, {}, nextDealer);
+      expect(nextDealer).toHaveBeenCalledWith(expect.any(ApiError));
+      expect(nextDealer.mock.calls[0][0].statusCode).toBe(403);
+
+      const reqDist = { businessUser: { role: 'DISTRIBUTOR', organization_id: 'org-2' } };
+      const nextDist = jest.fn();
+      middleware(reqDist, {}, nextDist);
+      expect(nextDist).toHaveBeenCalledWith(expect.any(ApiError));
+      expect(nextDist.mock.calls[0][0].statusCode).toBe(403);
     });
   });
 });

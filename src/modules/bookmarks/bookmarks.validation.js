@@ -54,7 +54,7 @@ function validate(schema, source = 'body') {
         field: d.path.join('.'),
         message: d.message,
       }));
-      return next(ApiError.validation('Validation error', details));
+      return next(ApiError.badRequest('Validation error', details));
     }
 
     if (source === 'query') {

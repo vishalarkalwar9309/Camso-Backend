@@ -24,6 +24,8 @@ function safeUser(user) {
     phone:              user.phone,
     display_name:       user.display_name,
     is_guest:           user.is_guest,
+    role:               user.is_guest ? 'GUEST' : 'END_USER',
+    user_type:          user.is_guest ? 'Guest' : 'End User',
     preferred_language: user.preferred_language,
     created_at:         user.created_at,
     updated_at:         user.updated_at,

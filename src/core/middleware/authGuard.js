@@ -35,10 +35,18 @@ function authGuard(req, res, next) {
   try {
     const decoded = verifyAccessToken(token);
 
-    // 3. Attach the principal — only sub and is_guest from the verified payload
+    const userRole = decoded.role || (decoded.is_guest ? 'GUEST' : 'END_USER');
     req.user = {
       id: decoded.sub,
       is_guest: decoded.is_guest,
+      role: userRole,
+    };
+    req.principal = {
+      id: decoded.id !== undefined ? decoded.id : decoded.sub,
+      type: decoded.type || (decoded.is_guest ? 'GUEST' : (decoded.role === 'CUSTOMER' ? 'END_USER' : 'END_USER')),
+      role: userRole,
+      is_guest: decoded.is_guest,
+      deviceId: decoded.deviceId || req.headers['x-device-id'] || 'unknown_device',
     };
 
     next();

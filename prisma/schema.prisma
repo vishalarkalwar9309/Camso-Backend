@@ -272,7 +272,8 @@ model Language {
   is_active   Boolean  @default(true)
   sort_order  Int      @default(0)
   created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  updated_at   DateTime      @updatedAt
+  translations Translation[]
 
   @@index([is_active, sort_order])
   @@map("languages")
@@ -384,6 +385,9 @@ model AdminUser {
 
   refresh_tokens AdminRefreshToken[]
   audit_logs     AuditLog[]
+  media_assets   MediaAsset[]
+  notifications  Notification[]
+  campaigns      Campaign[]
 
   @@index([role, is_active])
   @@map("admin_users")
@@ -410,6 +414,8 @@ enum AuditAction {
   DELETE
   LOGIN
   STATUS_CHANGE
+  PUBLISH
+  UNPUBLISH
 }
 
 model AuditLog {
@@ -420,6 +426,9 @@ model AuditLog {
   entity_type String
   entity_id   String?
   details     Json?
+  changes     Json?
+  ip_address  String?
+  user_agent  String?
   created_at  DateTime    @default(now())
 
   actor AdminUser? @relation(fields: [actor_id], references: [id], onDelete: SetNull)
@@ -437,6 +446,7 @@ model AuditLog {
 enum BusinessType {
   DEALER
   DISTRIBUTOR
+  OEM_PARTNER
 }
 
 enum ApprovalStatus {
@@ -508,6 +518,247 @@ model BusinessRefreshToken {
   @@index([expires_at])
   @@map("business_refresh_tokens")
 }
+
+// =============================================================================
+// Shared Core Models (Translations & Media Assets)
+// =============================================================================
+
+model Translation {
+  id            String   @id @default(cuid())
+  entity_type   String   @db.VarChar(100)
+  entity_id     String
+  field         String   @db.VarChar(100)
+  language_code String   @db.VarChar(10)
+  value         String   @db.Text
+
+  language Language @relation(fields: [language_code], references: [code])
+
+  @@unique([entity_type, entity_id, field, language_code])
+  @@index([entity_type, entity_id])
+  @@map("translations")
+}
+
+model MediaAsset {
+  id                   String   @id @default(cuid())
+  url                  String   @db.Text
+  filename             String   @db.VarChar(255)
+  mime_type            String   @db.VarChar(100)
+  size_bytes           Int
+  uploaded_by_admin_id String?
+  created_at           DateTime @default(now())
+
+  uploaded_by    AdminUser?     @relation(fields: [uploaded_by_admin_id], references: [id], onDelete: SetNull)
+  document_files DocumentFile[]
+  testimonials   Testimonial[]
+
+  @@map("media_assets")
+}
+
+// =============================================================================
+// Content CMS Domain Models (Documents, Testimonials, FAQs, Dealers, Feedback)
+// =============================================================================
+
+enum DocumentType {
+  CATALOGUE
+  BROCHURE
+  MANUAL
+  TECHNICAL_GUIDE
+  BULLETIN
+  WARRANTY
+  VIDEO
+}
+
+model Document {
+  id             String       @id @default(cuid())
+  product_id     String?
+  category_id    String?
+  document_type  DocumentType
+  is_published   Boolean      @default(false)
+  download_count Int          @default(0)
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+
+  files DocumentFile[]
+
+  @@index([product_id])
+  @@index([category_id])
+  @@index([is_published])
+  @@map("documents")
+}
+
+model DocumentFile {
+  id                      String   @id @default(cuid())
+  document_id             String
+  language_code           String   @db.VarChar(10)
+  media_asset_id          String
+  is_offline_downloadable Boolean  @default(false)
+
+  document    Document   @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  media_asset MediaAsset @relation(fields: [media_asset_id], references: [id], onDelete: Restrict)
+
+  @@unique([document_id, language_code])
+  @@map("document_files")
+}
+
+enum StoryType {
+  SOLIDS
+  OPERATING_COST
+  WORN_PRODUCT_REPLACEMENT
+  REPEAT_PURCHASE
+}
+
+model Testimonial {
+  id             String      @id @default(cuid())
+  product_id     String?
+  customer_name  String      @db.VarChar(255)
+  region         String      @db.VarChar(100)
+  story_type     StoryType
+  content        String      @db.Text
+  media_asset_id String?
+  is_published   Boolean     @default(false)
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
+
+  media_asset MediaAsset? @relation(fields: [media_asset_id], references: [id], onDelete: SetNull)
+
+  @@index([product_id])
+  @@index([is_published])
+  @@map("testimonials")
+}
+
+enum FaqCategory {
+  COMPANY
+  PRODUCT
+  DISTRIBUTION
+}
+
+model Faq {
+  id           String      @id @default(cuid())
+  product_id   String?
+  category     FaqCategory
+  sort_order   Int         @default(0)
+  is_published Boolean     @default(false)
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+
+  @@index([product_id])
+  @@index([category, is_published])
+  @@map("faqs")
+}
+
+enum DealerType {
+  DEALER
+  DISTRIBUTOR
+}
+
+model Dealer {
+  id        String     @id @default(cuid())
+  name      String     @db.VarChar(255)
+  type      DealerType
+  address   String     @db.Text
+  city      String     @db.VarChar(100)
+  state     String     @db.VarChar(100)
+  country   String     @db.VarChar(10)
+  geo_lat   Decimal    @db.Decimal(10, 7)
+  geo_lng   Decimal    @db.Decimal(10, 7)
+  phone     String?    @db.VarChar(50)
+  email     String?    @db.VarChar(255)
+  has_csr   Boolean    @default(false)
+  is_active Boolean    @default(true)
+
+  @@index([country, is_active])
+  @@index([geo_lat, geo_lng])
+  @@map("dealers")
+}
+
+enum FeedbackBucket {
+  PRODUCT
+  SERVICE
+  PRICING
+}
+
+model Feedback {
+  id         String         @id @default(cuid())
+  user_id    String?
+  device_id  String         @db.VarChar(255)
+  product_id String?
+  bucket     FeedbackBucket
+  rating     Int
+  comment    String?        @db.Text
+  created_at DateTime       @default(now())
+
+  @@index([user_id])
+  @@index([product_id])
+  @@index([bucket])
+  @@map("feedback")
+}
+
+// =============================================================================
+// Engagement & Campaigns Domain Models
+// =============================================================================
+
+enum NotificationType {
+  NEW_LAUNCH
+  DISCONTINUED
+  PROMOTION
+}
+
+enum NotificationStatus {
+  DRAFT
+  SENT
+}
+
+model Notification {
+  id                String             @id @default(cuid())
+  product_id        String?
+  campaign_id       String?
+  notification_type NotificationType
+  created_by        String
+  status            NotificationStatus @default(DRAFT)
+  sent_at           DateTime?
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+
+  campaign   Campaign? @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
+  admin_user AdminUser @relation(fields: [created_by], references: [id], onDelete: Cascade)
+
+  @@index([campaign_id])
+  @@index([created_by])
+  @@index([status])
+  @@map("notifications")
+}
+
+enum CampaignTargetType {
+  ALL_USERS
+  BUSINESS_TYPE
+  LANGUAGE
+  COUNTRY
+}
+
+enum CampaignStatus {
+  DRAFT
+  SENT
+}
+
+model Campaign {
+  id           String              @id @default(cuid())
+  name         String              @db.VarChar(255)
+  target_type  CampaignTargetType
+  target_value String?             @db.VarChar(100)
+  status       CampaignStatus      @default(DRAFT)
+  scheduled_at DateTime?
+  created_by   String
+  created_at   DateTime            @default(now())
+  updated_at   DateTime            @updatedAt
+
+  admin_user    AdminUser      @relation(fields: [created_by], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([created_by])
+  @@index([status])
+  @@map("campaigns")
+}
+
 
 
 

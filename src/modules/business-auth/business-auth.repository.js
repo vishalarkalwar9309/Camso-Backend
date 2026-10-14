@@ -7,12 +7,13 @@
 const prisma = require('../../config/database');
 
 async function registerBusinessOrganization({ orgData, userData }) {
+  const normalizedType = orgData.type === 'OEM' ? 'OEM_PARTNER' : orgData.type;
   return prisma.$transaction(async (tx) => {
     const organization = await tx.businessOrganization.create({
       data: {
         name: orgData.name,
         code: orgData.code || null,
-        type: orgData.type,
+        type: normalizedType,
         approval_status: 'PENDING',
         is_active: false,
         address: orgData.address || null,
@@ -31,7 +32,7 @@ async function registerBusinessOrganization({ orgData, userData }) {
         password_hash: userData.password_hash,
         display_name: userData.display_name || null,
         phone: userData.phone || null,
-        role: orgData.type,
+        role: normalizedType,
         status: 'PENDING',
       },
     });

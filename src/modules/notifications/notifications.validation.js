@@ -14,6 +14,13 @@ const sendNotificationSchema = Joi.object({
   data: Joi.object().unknown().default({}),
 });
 
+const listFeedSchema = Joi.object({
+  page: Joi.number().integer().min(1).optional(),
+  pageSize: Joi.number().integer().min(1).optional(),
+  sort: Joi.string().optional(),
+  lang: Joi.string().trim().min(2).max(10).optional(),
+});
+
 function validate(schema) {
   return (req, res, next) => {
     const { error, value } = schema.validate(req.body, { abortEarly: false, stripUnknown: true });
@@ -22,7 +29,7 @@ function validate(schema) {
         field: d.path.join('.'),
         message: d.message,
       }));
-      return next(ApiError.validation(error.message, details));
+      return next(ApiError.badRequest(error.message, details));
     }
     req.body = value;
     next();
@@ -31,5 +38,6 @@ function validate(schema) {
 
 module.exports = {
   sendNotificationSchema,
+  listFeedSchema,
   validate,
 };

@@ -88,4 +88,54 @@ router.get('/distributor/portal', requireBusinessRole('DISTRIBUTOR'), async (req
   }, 200);
 });
 
+/**
+ * GET /api/v1/business/oem/portal
+ * Restricted to OEM_PARTNER persona only.
+ */
+router.get('/oem/portal', requireBusinessRole('OEM_PARTNER'), async (req, res) => {
+  sendSuccess(res, {
+    portal: 'OEM_PARTNER_PORTAL',
+    message: 'Welcome to the OEM Engineering & Technical Portal.',
+    organization_id: req.businessUser.organization_id,
+    authorized_features: [
+      'technical_specifications',
+      'cad_drawings_access',
+      'engineering_enquiries',
+      'co_development_projects',
+    ],
+  }, 200);
+});
+
+/**
+ * GET /api/v1/business/oem/documents
+ * Restricted to OEM_PARTNER persona only.
+ * Returns approved technical documents for OEM integration partners.
+ */
+router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res, next) => {
+  try {
+    const documents = await prisma.document.findMany({
+      where: {
+        is_published: true,
+        document_type: {
+          in: ['TECHNICAL_GUIDE', 'MANUAL', 'BULLETIN', 'CATALOGUE'],
+        },
+      },
+      include: {
+        files: {
+          select: {
+            id: true,
+            language_code: true,
+            is_offline_downloadable: true,
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    sendSuccess(res, documents, 200);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

@@ -10,7 +10,7 @@
 const { verifyAccessToken } = require('../utils/tokenService');
 const ApiError = require('../utils/ApiError');
 
-const BUSINESS_ROLES = ['DEALER', 'DISTRIBUTOR'];
+const BUSINESS_ROLES = ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'];
 
 function businessGuard(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -30,7 +30,7 @@ function businessGuard(req, res, next) {
     // Verify token has business context with allowed role and organization_id
     const role = decoded.role;
     if (!role || !BUSINESS_ROLES.includes(role)) {
-      return next(ApiError.forbidden('Business role (DEALER or DISTRIBUTOR) required.'));
+      return next(ApiError.forbidden('Business role (DEALER, DISTRIBUTOR, or OEM_PARTNER) required.'));
     }
 
     if (!decoded.org_id) {

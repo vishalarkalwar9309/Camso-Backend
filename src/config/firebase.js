@@ -83,6 +83,13 @@ function getMessaging() {
 }
 
 module.exports = {
+  admin,
+  get firebaseApp() {
+    return firebaseApp;
+  },
+  get isFirebaseReady() {
+    return isFirebaseReady;
+  },
   initFirebase,
   getFirebaseApp,
   getIsFirebaseReady,

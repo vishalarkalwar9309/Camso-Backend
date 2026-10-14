@@ -30,7 +30,7 @@ function validate(schema) {
 const registerSchema = Joi.object({
   organization: Joi.object({
     name: Joi.string().trim().min(2).max(150).required(),
-    type: Joi.string().valid('DEALER', 'DISTRIBUTOR').required(),
+    type: Joi.string().valid('DEALER', 'DISTRIBUTOR', 'OEM_PARTNER', 'OEM').required(),
     code: Joi.string().trim().max(50).optional(),
     address: Joi.string().trim().max(255).optional(),
     city: Joi.string().trim().max(100).optional(),

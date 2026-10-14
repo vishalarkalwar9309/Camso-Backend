@@ -44,6 +44,8 @@ describe('usersService.getMe', () => {
       phone: '+919876543210',
       display_name: 'CEAT Dealer 1',
       is_guest: false,
+      role: 'END_USER',
+      user_type: 'End User',
       preferred_language: 'en',
       created_at: MOCK_DB_USER.created_at,
       updated_at: MOCK_DB_USER.updated_at,

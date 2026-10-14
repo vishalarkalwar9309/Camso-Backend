@@ -2,21 +2,19 @@
 
 const service = require('./analytics.service');
 const { sendSuccess } = require('../../core/utils/ApiResponse');
+const asyncHandler = require('../../core/utils/asyncHandler');
 
-/**
- * GET /api/v1/admin/analytics/catalogue
- * Aggregated top search terms, most bookmarked products, and catalogue summary.
- */
-async function getCatalogueAnalytics(req, res, next) {
-  try {
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
-    const data = await service.getCatalogueAnalytics(limit);
-    return sendSuccess(res, data, 200);
-  } catch (err) {
-    next(err);
-  }
-}
+const getCatalogueAnalytics = asyncHandler(async (req, res) => {
+  const result = await service.getCatalogueAnalytics(req.query.limit);
+  sendSuccess(res, result, 200);
+});
+
+const getContentAnalytics = asyncHandler(async (req, res) => {
+  const result = await service.getContentAnalytics(req.query);
+  sendSuccess(res, result, 200);
+});
 
 module.exports = {
   getCatalogueAnalytics,
+  getContentAnalytics,
 };

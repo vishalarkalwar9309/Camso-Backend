@@ -84,9 +84,20 @@ function validateEnvironment(env = process.env) {
  * @returns {{ customerPass: string, adminPass: string, dealerPass: string, distribPass: string }}
  */
 function validateDemoCredentials(env = process.env) {
-  const missing = REQUIRED_DEMO_ENV_VARS.filter(
-    (key) => !env[key] || env[key].trim() === ''
-  );
+  const endUserPass = env.DEMO_ENDUSER_PASSWORD || env.DEMO_CUSTOMER_PASSWORD;
+  const missing = [];
+  if (!endUserPass || endUserPass.trim() === '') {
+    missing.push('DEMO_ENDUSER_PASSWORD (or DEMO_CUSTOMER_PASSWORD)');
+  }
+  if (!env.DEMO_ADMIN_PASSWORD || env.DEMO_ADMIN_PASSWORD.trim() === '') {
+    missing.push('DEMO_ADMIN_PASSWORD');
+  }
+  if (!env.DEMO_DEALER_PASSWORD || env.DEMO_DEALER_PASSWORD.trim() === '') {
+    missing.push('DEMO_DEALER_PASSWORD');
+  }
+  if (!env.DEMO_DISTRIBUTOR_PASSWORD || env.DEMO_DISTRIBUTOR_PASSWORD.trim() === '') {
+    missing.push('DEMO_DISTRIBUTOR_PASSWORD');
+  }
 
   if (missing.length > 0) {
     throw new Error(
@@ -97,7 +108,7 @@ function validateDemoCredentials(env = process.env) {
   }
 
   return {
-    customerPass: env.DEMO_CUSTOMER_PASSWORD,
+    customerPass: endUserPass,
     adminPass: env.DEMO_ADMIN_PASSWORD,
     dealerPass: env.DEMO_DEALER_PASSWORD,
     distribPass: env.DEMO_DISTRIBUTOR_PASSWORD,
@@ -115,7 +126,7 @@ async function seedDemoAccounts(prisma, credentials) {
   const results = { created: [], existed: [] };
 
   // ---------------------------------------------------------------------------
-  // 1. Customer Persona
+  // 1. End User Persona (formerly Customer)
   // ---------------------------------------------------------------------------
   const customerEmail = 'demo.customer@camso.local';
   const existingCustomer = await prisma.user.findUnique({
@@ -123,24 +134,26 @@ async function seedDemoAccounts(prisma, credentials) {
     select: { id: true, display_name: true, is_guest: true, is_active: true },
   });
 
+  const validNames = ['Demo End User', 'Demo Customer'];
+
   if (!existingCustomer) {
-    const passwordHash = await hashPassword(credentials.customerPass);
+    const passwordHash = await hashPassword(credentials.endUserPass || credentials.customerPass);
     await prisma.user.create({
       data: {
         email: customerEmail,
         password_hash: passwordHash,
-        display_name: 'Demo Customer',
+        display_name: 'Demo End User',
         is_guest: false,
         is_active: true,
         preferred_language: 'en',
       },
     });
-    results.created.push(`Customer (${customerEmail})`);
+    results.created.push(`End User (${customerEmail})`);
   } else {
-    if (existingCustomer.display_name !== 'Demo Customer' || existingCustomer.is_guest !== false) {
-      throw new Error(`[CONFLICT] Email ${customerEmail} exists but identity details do not match synthetic customer demo.`);
+    if (!validNames.includes(existingCustomer.display_name) || existingCustomer.is_guest !== false) {
+      throw new Error(`[CONFLICT] Email ${customerEmail} exists but identity details do not match synthetic end user demo.`);
     }
-    results.existed.push(`Customer (${customerEmail})`);
+    results.existed.push(`End User (${customerEmail})`);
   }
 
   // ---------------------------------------------------------------------------

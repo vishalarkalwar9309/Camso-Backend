@@ -104,10 +104,51 @@ const adminMediaRoutes = require('../modules/media/media.admin.routes');
 router.use('/admin/media', adminMediaRoutes);
 
 // Push Notifications & Campaign Delivery
+const notificationsRoutes = require('../modules/notifications/notifications.routes');
 const adminNotificationsRoutes = require('../modules/notifications/notifications.admin.routes');
+router.use('/notifications', notificationsRoutes);
 router.use('/admin/notifications', adminNotificationsRoutes);
 
+// Integrated: Public Routes
+const documentsRoutes = require('../modules/documents/documents.routes');
+const testimonialsRoutes = require('../modules/testimonials/testimonials.routes');
+const faqsRoutes = require('../modules/faqs/faqs.routes');
+const dealersRoutes = require('../modules/dealers/dealers.routes');
+const feedbackRoutes = require('../modules/feedback/feedback.routes');
+
+router.use('/documents', documentsRoutes);
+router.use('/testimonials', testimonialsRoutes);
+router.use('/faqs', faqsRoutes);
+router.use('/dealers', dealersRoutes);
+router.use('/feedback', feedbackRoutes);
+
+// Integrated: Admin Routes (protected by adminGuard + auditContext)
+const adminGuard = require('../core/middleware/adminGuard');
+const auditContext = require('../core/middleware/auditContext');
+
+const adminDocumentsRoutes = require('../modules/documents/documents.admin.routes');
+const adminTestimonialsRoutes = require('../modules/testimonials/testimonials.admin.routes');
+const adminFaqsRoutes = require('../modules/faqs/faqs.admin.routes');
+const adminDealersRoutes = require('../modules/dealers/dealers.admin.routes');
+const adminFeedbackRoutes = require('../modules/feedback/feedback.admin.routes');
+const adminCampaignsRoutes = require('../modules/campaigns/campaigns.admin.routes');
+
+const integratedAdminRouter = Router();
+integratedAdminRouter.use(adminGuard);
+integratedAdminRouter.use(auditContext);
+
+integratedAdminRouter.use('/documents', adminDocumentsRoutes);
+integratedAdminRouter.use('/testimonials', adminTestimonialsRoutes);
+integratedAdminRouter.use('/faqs', adminFaqsRoutes);
+integratedAdminRouter.use('/dealers', adminDealersRoutes);
+integratedAdminRouter.use('/feedback', adminFeedbackRoutes);
+integratedAdminRouter.use('/campaigns', adminCampaignsRoutes);
+
+router.use('/admin', integratedAdminRouter);
+
 module.exports = router;
+
+
 
 
 

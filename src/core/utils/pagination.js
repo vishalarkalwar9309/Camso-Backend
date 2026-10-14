@@ -1,61 +1,111 @@
 'use strict';
 
 /**
- * pagination — shared query parameter parser for list endpoints.
+ * src/core/utils/pagination.js
  *
- * Parses page, pageSize, and sort from req.query and returns
- * Prisma-compatible skip/take/orderBy values.
- *
- * API contract (from backend plan Section 8):
- *   page     — 1-indexed, default 1, minimum 1
- *   pageSize — default 20, maximum 100
- *   sort     — field name; prefix with '-' for descending (e.g. '-createdAt')
+ * Shared query parameter parser for list endpoints.
  */
 
 const PAGE_DEFAULT = 1;
 const PAGE_SIZE_DEFAULT = 20;
 const PAGE_SIZE_MAX = 100;
-const SORT_DEFAULT = 'createdAt';
+const SORT_DEFAULT = 'created_at:desc';
 
 /**
  * Parse pagination parameters from Express query string.
- *
- * @param {object} query - req.query
- * @param {string} [defaultSort] - Default sort field (defaults to 'createdAt')
- * @returns {{ skip: number, take: number, orderBy: object, page: number, pageSize: number }}
+ * Supports string defaultSort or defaults object { page, pageSize, sort }.
  */
-function parsePagination(query, defaultSort = SORT_DEFAULT) {
-  const page = Math.max(PAGE_DEFAULT, parseInt(query.page, 10) || PAGE_DEFAULT);
-  const pageSize = Math.min(
-    PAGE_SIZE_MAX,
-    Math.max(1, parseInt(query.pageSize, 10) || PAGE_SIZE_DEFAULT)
-  );
+function parsePagination(query = {}, defaults = {}) {
+  const defaultPage = (typeof defaults === 'object' && defaults.page) || PAGE_DEFAULT;
+  const defaultSize = (typeof defaults === 'object' && defaults.pageSize) || PAGE_SIZE_DEFAULT;
+
+  const page = Math.max(1, parseInt(query.page, 10) || defaultPage);
+  const rawPageSize = parseInt(query.pageSize, 10) || defaultSize;
+  const pageSize = Math.min(PAGE_SIZE_MAX, Math.max(1, rawPageSize));
   const skip = (page - 1) * pageSize;
   const take = pageSize;
 
-  const sortParam = query.sort || defaultSort;
+  let sortParam;
+  if (typeof defaults === 'string') {
+    sortParam = query.sort || defaults;
+  } else if (typeof defaults === 'object' && defaults.sort) {
+    sortParam = query.sort || defaults.sort;
+  } else {
+    sortParam = query.sort || SORT_DEFAULT;
+  }
+
   const isDescending = sortParam.startsWith('-');
   const sortField = isDescending ? sortParam.slice(1) : sortParam;
   const orderBy = { [sortField]: isDescending ? 'desc' : 'asc' };
 
-  return { skip, take, orderBy, page, pageSize };
+  return { skip, take, orderBy, page, pageSize, sort: sortParam };
+}
+
+/**
+ * parseSort
+ *
+ * @param {string} [sortParam]
+ * @param {Array<string>} allowedFields
+ * @param {string} defaultField
+ * @param {'asc'|'desc'} [defaultDir='desc']
+ */
+function parseSort(sortParam, allowedFields = [], defaultField = 'created_at', defaultDir = 'desc') {
+  if (!sortParam || typeof sortParam !== 'string') {
+    return {
+      field: defaultField,
+      direction: defaultDir,
+      orderBy: { [defaultField]: defaultDir },
+    };
+  }
+
+  const trimmed = sortParam.trim();
+  let field = trimmed;
+  let direction = defaultDir;
+
+  if (trimmed.startsWith('-')) {
+    field = trimmed.slice(1);
+    direction = 'desc';
+  } else if (trimmed.startsWith('+')) {
+    field = trimmed.slice(1);
+    direction = 'asc';
+  } else if (trimmed.includes(':')) {
+    const [f, dir] = trimmed.split(':');
+    field = f;
+    direction = dir && dir.toLowerCase() === 'asc' ? 'asc' : 'desc';
+  }
+
+  if (allowedFields.length > 0 && !allowedFields.includes(field)) {
+    return {
+      field: defaultField,
+      direction: defaultDir,
+      orderBy: { [defaultField]: defaultDir },
+    };
+  }
+
+  return {
+    field,
+    direction,
+    orderBy: { [field]: direction },
+  };
 }
 
 /**
  * Build the meta object for a paginated response.
- *
- * @param {number} page
- * @param {number} pageSize
- * @param {number} total - Total record count from database
- * @returns {{ page: number, pageSize: number, total: number, totalPages: number }}
  */
 function buildMeta(page, pageSize, total) {
   return {
     page,
     pageSize,
     total,
-    totalPages: Math.ceil(total / pageSize),
+    totalPages: Math.ceil(total / pageSize) || 1,
   };
 }
 
-module.exports = { parsePagination, buildMeta };
+const buildPaginationMeta = buildMeta;
+
+module.exports = {
+  parsePagination,
+  parseSort,
+  buildMeta,
+  buildPaginationMeta,
+};

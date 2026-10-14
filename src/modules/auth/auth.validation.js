@@ -56,11 +56,15 @@ const registerSchema = Joi.object({
 
   display_name: Joi.string().trim().max(100).optional(),
   preferred_language: Joi.string().trim().length(2).lowercase().optional().default('en'),
+  role: Joi.string().valid('END_USER', 'CUSTOMER').optional(),
+  user_type: Joi.string().optional(),
 });
 
 const loginSchema = Joi.object({
   email: Joi.string().email({ tlds: { allow: false } }).lowercase().trim().required(),
   password: Joi.string().required(),
+  role: Joi.string().optional(),
+  roleId: Joi.string().optional(),
 });
 
 const refreshSchema = Joi.object({

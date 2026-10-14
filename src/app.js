@@ -96,4 +96,14 @@ app.use(notFound);
 // 8. Error handler — must be last (4-argument signature required by Express)
 app.use(errorHandler);
 
+function createApp() {
+  return app;
+}
+
+app.createApp = createApp;
+app.app = app;
+
 module.exports = app;
+module.exports.createApp = createApp;
+module.exports.app = app;
+

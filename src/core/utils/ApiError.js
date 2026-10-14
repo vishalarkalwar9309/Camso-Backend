@@ -8,7 +8,7 @@
  * by instanceof check and maps them to the correct HTTP response.
  *
  * Error type strings match the API contract defined in the backend plan:
- *   VALIDATION_ERROR | UNAUTHORIZED | FORBIDDEN | NOT_FOUND | INTERNAL_ERROR
+ *   VALIDATION_ERROR | UNAUTHORIZED | FORBIDDEN | NOT_FOUND | INTERNAL_ERROR | CONFLICT | BAD_REQUEST
  */
 
 class ApiError extends Error {
@@ -16,14 +16,16 @@ class ApiError extends Error {
    * @param {number} statusCode - HTTP status code
    * @param {string} type       - Error type string (see API contract)
    * @param {string} message    - Human-readable message (safe to return to client)
-   * @param {Array}  details    - Optional array of field-level validation details
+   * @param {Array|object|null} details - Optional field-level validation details
    */
-  constructor(statusCode, type, message, details = []) {
+  constructor(statusCode, type, message, details = null) {
     super(message);
     this.name = 'ApiError';
     this.statusCode = statusCode;
     this.type = type;
     this.details = details;
+    this.isOperational = true;
+
     // Capture stack in development; omitted from API responses in production
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, ApiError);
@@ -32,12 +34,12 @@ class ApiError extends Error {
 
   // --- Static factory methods ---
 
-  static badRequest(message, details = []) {
+  static badRequest(message = 'Bad Request', details = null) {
     return new ApiError(400, 'VALIDATION_ERROR', message, details);
   }
 
-  static validation(message = 'Validation failed', details = []) {
-    return new ApiError(400, 'VALIDATION_ERROR', message, details);
+  static validation(message = 'Validation failed', details = null) {
+    return new ApiError(422, 'VALIDATION_ERROR', message, details);
   }
 
   static unauthorized(message = 'Authentication required') {
@@ -60,6 +62,5 @@ class ApiError extends Error {
     return new ApiError(500, 'INTERNAL_ERROR', message);
   }
 }
-
 
 module.exports = ApiError;

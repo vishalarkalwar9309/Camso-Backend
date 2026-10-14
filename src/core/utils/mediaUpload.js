@@ -113,9 +113,43 @@ async function uploadFileToStorage({ file, folder = 'uploads' }) {
   };
 }
 
+const mediaAssetRepository = require('../repositories/mediaAsset.repository');
+
+/**
+ * Uploads a file (to Firebase Storage or local fallback) and creates a MediaAsset record.
+ *
+ * @param {object} file - Multer file object
+ * @param {string|number} adminUserId - Uploading admin ID
+ * @param {object} [prismaClient] - Optional Prisma client instance
+ * @param {string} [folder='uploads'] - Target folder
+ * @returns {Promise<object>} Created MediaAsset record
+ */
+async function uploadToFirebase(file, adminUserId, prismaClient, folder = 'uploads') {
+  if (!file || !file.buffer) {
+    throw ApiError.badRequest('No file provided or file buffer is empty.');
+  }
+
+  const uploadResult = await uploadFileToStorage({ file, folder });
+
+  const mediaAsset = await mediaAssetRepository.createMediaAsset(
+    {
+      url: uploadResult.url,
+      filename: file.originalname || uploadResult.filename,
+      mime_type: file.mimetype,
+      size_bytes: file.size,
+      uploaded_by_admin_id: adminUserId ? String(adminUserId) : null,
+    },
+    prismaClient
+  );
+
+  return mediaAsset;
+}
+
 module.exports = {
   upload,
   uploadFileToStorage,
+  uploadToFirebase,
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
 };
+
