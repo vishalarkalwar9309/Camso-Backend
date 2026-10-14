@@ -80,11 +80,11 @@ enum NotificationStatus {
  *   product_id is a cross-domain reference (no Prisma relation declared).
  */
 model Notification {
-  id                Int                @id @default(autoincrement())
-  product_id        Int?
-  campaign_id       Int?
+  id                String             @id @default(cuid())
+  product_id        String?
+  campaign_id       String?
   notification_type NotificationType
-  created_by        Int
+  created_by        String
   status            NotificationStatus @default(DRAFT)
   sent_at           DateTime?
   created_at        DateTime           @default(now())
@@ -133,14 +133,14 @@ enum CampaignStatus {
  *      the push notification. The actual send is triggered by POST /send.
  *
  * CONTAINS:
- *   id           — Auto-increment PK.
+ *   id           — CUID PK.
  *   name         — Human-readable campaign label.
  *   target_type  — Targeting strategy (enum).
  *   target_value — Optional filter value (e.g. "Distributor", "fr", "IN").
  *                  Null when target_type = ALL_USERS.
  *   status       — DRAFT | SENT.
  *   scheduled_at — Informational only for Launch 1. No cron drives this.
- *   created_by   — FK to AdminUser who created the campaign.
+ *   created_by   — FK to AdminUser who created the campaign (CUID).
  *   created_at   — Creation timestamp.
  *   updated_at   — Last modification timestamp.
  *
@@ -158,13 +158,13 @@ enum CampaignStatus {
  *     - Response: { targetCount, successCount, failureCount }
  */
 model Campaign {
-  id           Int                 @id @default(autoincrement())
+  id           String              @id @default(cuid())
   name         String              @db.VarChar(255)
   target_type  CampaignTargetType
   target_value String?             @db.VarChar(100)
   status       CampaignStatus      @default(DRAFT)
   scheduled_at DateTime?
-  created_by   Int
+  created_by   String
   created_at   DateTime            @default(now())
   updated_at   DateTime            @updatedAt
 

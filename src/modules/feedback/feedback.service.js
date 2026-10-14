@@ -62,7 +62,7 @@ const feedbackService = {
     const filters = {};
     if (query.bucket) filters.bucket = query.bucket;
     if (query.rating) filters.rating = parseInt(query.rating, 10);
-    if (query.product_id) filters.product_id = parseInt(query.product_id, 10);
+    if (query.product_id) filters.product_id = String(query.product_id);
 
     const { total, data } = await feedbackRepository.findAdminFeedback(filters, { skip, take, sort });
     return {

@@ -27,8 +27,8 @@
  * SearchLog — individual search event.
  */
 model SearchLog {
-  id            Int      @id @default(autoincrement())
-  user_id       Int?
+  id            String   @id @default(cuid())
+  user_id       String?
   device_id     String   @db.VarChar(255)
   query_text    String   @db.VarChar(500)
   filters       Json?
@@ -59,10 +59,10 @@ model PopularSearch {
  *   (not via @@unique in PSL) — see docs/CAMSO_Backend_Plan.md Section 4.
  */
 model Bookmark {
-  id         Int      @id @default(autoincrement())
-  user_id    Int?
+  id         String   @id @default(cuid())
+  user_id    String?
   device_id  String?  @db.VarChar(255)
-  product_id Int
+  product_id String
   created_at DateTime @default(now())
 
   @@index([user_id])

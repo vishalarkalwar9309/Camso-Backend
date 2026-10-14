@@ -69,8 +69,8 @@ const dealersController = {
    * @param {import('express').Response} res
    */
   async adminGetById(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid dealer ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const dealer = await dealersService.adminGetDealerById(id);
     return ApiResponse.success(res, dealer);
   },
@@ -96,8 +96,8 @@ const dealersController = {
    * @param {import('express').Response} res
    */
   async adminUpdate(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid dealer ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const data = dealersValidation.validateUpdateDealer(req.body);
     const dealer = await dealersService.adminUpdateDealer(id, data, req.auditContext);
     return ApiResponse.success(res, dealer);

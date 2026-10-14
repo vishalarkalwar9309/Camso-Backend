@@ -62,8 +62,8 @@ const notificationsController = {
    * @param {import('express').Response} res
    */
   async adminGetById(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid notification ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const notification = await notificationsService.adminGetNotificationById(id, req.query.lang || 'en');
     return ApiResponse.success(res, notification);
   },
@@ -88,8 +88,8 @@ const notificationsController = {
    * @param {import('express').Response} res
    */
   async adminUpdate(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid notification ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const notification = await notificationsService.adminUpdateNotification(id, req.body, req.auditContext);
     return ApiResponse.success(res, notification);
   },

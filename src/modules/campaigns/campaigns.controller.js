@@ -50,8 +50,8 @@ const campaignsController = {
    * @param {import('express').Response} res
    */
   async adminGetById(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid campaign ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const campaign = await campaignsService.getCampaignById(id);
     return ApiResponse.success(res, campaign);
   },
@@ -76,8 +76,8 @@ const campaignsController = {
    * @param {import('express').Response} res
    */
   async adminUpdate(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid campaign ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const campaign = await campaignsService.updateCampaign(id, req.body, req.auditContext);
     return ApiResponse.success(res, campaign);
   },
@@ -99,8 +99,8 @@ const campaignsController = {
    * @param {import('express').Response} res
    */
   async adminSend(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid campaign ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const result = await campaignsService.sendCampaign(id, req.auditContext);
     return ApiResponse.success(res, result);
   },

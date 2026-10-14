@@ -20,12 +20,13 @@
  */
 
 const Joi = require('joi');
+const { cuidOptional } = require('../../core/utils/idValidation');
 
 const submitFeedbackSchema = Joi.object({
   bucket: Joi.string().valid('PRODUCT', 'SERVICE', 'PRICING').required(),
   rating: Joi.number().integer().min(1).max(5).required(),
   comment: Joi.string().trim().max(2000).allow('', null).optional(),
-  product_id: Joi.number().integer().positive().allow(null).optional()
+  product_id: cuidOptional,
 });
 
 module.exports = { submitFeedbackSchema };

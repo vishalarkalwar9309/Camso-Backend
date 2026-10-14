@@ -95,9 +95,9 @@ model Language {
  *   Prisma 6.x — @@unique constraint declared in PSL.
  */
 model Translation {
-  id            Int      @id @default(autoincrement())
+  id            String   @id @default(cuid())
   entity_type   String   @db.VarChar(100)
-  entity_id     Int
+  entity_id     String
   field         String   @db.VarChar(100)
   language_code String   @db.VarChar(10)
   value         String   @db.Text
@@ -119,12 +119,12 @@ model Translation {
  *      URL and metadata returned after server-side upload.
  *
  * CONTAINS:
- *   id                  — Auto-increment PK.
+ *   id                  — CUID PK.
  *   url                 — Public Firebase Storage URL.
  *   filename            — Original filename as uploaded.
  *   mime_type           — MIME type (e.g. "application/pdf", "image/jpeg").
  *   size_bytes          — File size in bytes.
- *   uploaded_by_admin_id— FK to admin_users.id. Every Launch-1 upload is admin.
+ *   uploaded_by_admin_id— FK to admin_users.id (CUID).
  *   created_at          — Upload timestamp.
  *
  * KEY DESIGN:
@@ -136,12 +136,12 @@ model Translation {
  *   DocumentFile, Testimonial, ProductImage (via media_asset_id FK)
  */
 model MediaAsset {
-  id                   Int      @id @default(autoincrement())
+  id                   String   @id @default(cuid())
   url                  String   @db.Text
   filename             String   @db.VarChar(255)
   mime_type            String   @db.VarChar(100)
   size_bytes           Int
-  uploaded_by_admin_id Int
+  uploaded_by_admin_id String
   created_at           DateTime @default(now())
 
   // Relation defined in content.prisma (AdminUser model)
@@ -165,9 +165,9 @@ model MediaAsset {
  *      Middleware cannot know before/after state; only the service can.
  *
  * CONTAINS:
- *   id          — Auto-increment PK.
+ *   id          — CUID PK.
  *   actor_type  — Always "ADMIN" in Launch 1.
- *   actor_id    — ID of the admin_user who performed the action.
+ *   actor_id    — ID of the admin_user who performed the action (CUID).
  *   action      — Enum: CREATE | UPDATE | DELETE | PUBLISH | UNPUBLISH | LOGIN.
  *   entity_type — String name of the mutated entity (e.g. "DOCUMENT", "FAQ").
  *   entity_id   — ID of the mutated record (nullable for LOGIN events).
@@ -196,12 +196,12 @@ enum AuditAction {
 }
 
 model AuditLog {
-  id          Int         @id @default(autoincrement())
+  id          String      @id @default(cuid())
   actor_type  String      @default("ADMIN") @db.VarChar(20)
-  actor_id    Int
+  actor_id    String
   action      AuditAction
   entity_type String      @db.VarChar(100)
-  entity_id   Int?
+  entity_id   String?
   changes     Json?
   ip_address  String?     @db.VarChar(50)
   user_agent  String?     @db.Text
@@ -222,7 +222,7 @@ model AuditLog {
  *      and reuse-detection (token replay attack mitigation).
  *
  * CONTAINS:
- *   id               — Auto-increment PK.
+ *   id               — CUID PK.
  *   user_id          — FK to users.id (nullable). Set for end-users.
  *   admin_user_id    — FK to admin_users.id (nullable). Set for admins.
  *   token_hash       — Bcrypt/SHA-256 hash of the actual token. Never store plaintext.
@@ -250,9 +250,9 @@ model AuditLog {
  * REFERENCE: docs/CAMSO_Backend_Plan.md Section 7 (refresh_tokens)
  */
 model RefreshToken {
-  id            Int       @id @default(autoincrement())
-  user_id       Int?
-  admin_user_id Int?
+  id            String    @id @default(cuid())
+  user_id       String?
+  admin_user_id String?
   token_hash    String    @unique @db.VarChar(255)
   expires_at    DateTime
   revoked_at    DateTime?

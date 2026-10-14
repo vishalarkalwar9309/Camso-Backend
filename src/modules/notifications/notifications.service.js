@@ -71,8 +71,8 @@ const notificationsService = {
     const filters = {};
     if (query.notification_type) filters.notification_type = query.notification_type;
     if (query.status) filters.status = query.status;
-    if (query.product_id) filters.product_id = parseInt(query.product_id, 10);
-    if (query.campaign_id) filters.campaign_id = parseInt(query.campaign_id, 10);
+    if (query.product_id) filters.product_id = String(query.product_id);
+    if (query.campaign_id) filters.campaign_id = String(query.campaign_id);
 
     const { total, data } = await notificationsRepository.findAdminNotifications(filters, { skip, take, sort });
     const lang = query.lang || 'en';

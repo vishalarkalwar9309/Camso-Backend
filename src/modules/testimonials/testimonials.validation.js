@@ -26,6 +26,7 @@
 
 const Joi = require('joi');
 const ApiError = require('../../core/utils/ApiError');
+const { cuidSchema, cuidRequired, cuidOptional } = require('../../core/utils/idValidation');
 
 const STORY_TYPES = [
   'SOLIDS',
@@ -35,8 +36,8 @@ const STORY_TYPES = [
 ];
 
 const listQuerySchema = Joi.object({
-  product: Joi.number().integer().positive().optional(),
-  product_id: Joi.number().integer().positive().optional(),
+  product: cuidOptional,
+  product_id: cuidOptional,
   type: Joi.string().valid(...STORY_TYPES).optional(),
   story_type: Joi.string().valid(...STORY_TYPES).optional(),
   lang: Joi.string().max(10).default('en'),
@@ -79,22 +80,22 @@ function validateListQuery(query) {
 }
 
 const createTestimonialSchema = Joi.object({
-  product_id: Joi.number().integer().positive().allow(null).optional(),
+  product_id: cuidOptional,
   customer_name: Joi.string().max(255).required(),
   region: Joi.string().max(100).required(),
   story_type: Joi.string().valid(...STORY_TYPES).required(),
   content: Joi.string().required(),
-  media_asset_id: Joi.number().integer().positive().allow(null).optional(),
+  media_asset_id: cuidOptional,
   is_published: Joi.boolean().default(false),
 });
 
 const updateTestimonialSchema = Joi.object({
-  product_id: Joi.number().integer().positive().allow(null).optional(),
+  product_id: cuidOptional,
   customer_name: Joi.string().max(255).optional(),
   region: Joi.string().max(100).optional(),
   story_type: Joi.string().valid(...STORY_TYPES).optional(),
   content: Joi.string().optional(),
-  media_asset_id: Joi.number().integer().positive().allow(null).optional(),
+  media_asset_id: cuidOptional,
   is_published: Joi.boolean().optional(),
 });
 

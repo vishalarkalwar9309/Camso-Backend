@@ -62,7 +62,7 @@ enum Platform {
  *   business_type is profile data, NOT an access-control role in Launch 1.
  */
 model User {
-  id                 Int           @id @default(autoincrement())
+  id                 String        @id @default(cuid())
   email              String?       @unique @db.VarChar(255)
   phone              String?       @db.VarChar(50)
   password_hash      String?       @db.VarChar(255)
@@ -87,7 +87,7 @@ model User {
  *      Used for campaign targeting and push send.
  *
  * CONTAINS:
- *   id          — Auto-increment PK.
+ *   id          — CUID PK.
  *   user_id     — Optional FK to User (nullable for guest devices).
  *   device_id   — Client-generated unique device identifier.
  *   fcm_token   — Firebase Cloud Messaging registration token.
@@ -98,8 +98,8 @@ model User {
  *   created_at / updated_at — Standard timestamps.
  */
 model UserDevice {
-  id           Int       @id @default(autoincrement())
-  user_id      Int?
+  id           String    @id @default(cuid())
+  user_id      String?
   device_id    String    @db.VarChar(255)
   fcm_token    String    @db.VarChar(255)
   platform     Platform
@@ -125,8 +125,8 @@ model UserDevice {
  *      name/description stored in Translation (entity_type="CATEGORY").
  */
 model Category {
-  id        Int        @id @default(autoincrement())
-  parent_id Int?
+  id        String     @id @default(cuid())
+  parent_id String?
   slug      String     @unique @db.VarChar(255)
   is_active Boolean    @default(true)
 
@@ -157,9 +157,9 @@ enum SpecType {
  *   slug is URL-safe identifier. pid is the Camso product code.
  */
 model Product {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(cuid())
   pid         String   @unique @db.VarChar(100)
-  category_id Int
+  category_id String
   slug        String   @unique @db.VarChar(255)
   is_active   Boolean  @default(true)
 
@@ -174,9 +174,9 @@ model Product {
  * ProductImage — product image links to MediaAsset.
  */
 model ProductImage {
-  id             Int     @id @default(autoincrement())
-  product_id     Int
-  media_asset_id Int
+  id             String  @id @default(cuid())
+  product_id     String
+  media_asset_id String
   sort_order     Int     @default(0)
   is_primary     Boolean @default(false)
 
@@ -190,8 +190,8 @@ model ProductImage {
  * ProductSpecification — technical specifications for a product.
  */
 model ProductSpecification {
-  id            Int      @id @default(autoincrement())
-  product_id    Int
+  id            String   @id @default(cuid())
+  product_id    String
   spec_type     SpecType
   spec_key      String   @db.VarChar(100)
   spec_value    String   @db.VarChar(255)

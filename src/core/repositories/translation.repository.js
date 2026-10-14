@@ -44,13 +44,14 @@ const translationRepository = {
    * USE: Fetches all translation records for a given entity_type and entity_id.
    *
    * @param {string} entityType — e.g. "DOCUMENT", "FAQ"
-   * @param {number} entityId — integer PK of the entity
+   * @param {string|number} entityId — identifier of the entity
    * @param {object} [prismaClient=prisma] — Prisma client instance
    * @returns {Promise<Array<{ field: string, language_code: string, value: string }>>}
    */
   async findByEntity(entityType, entityId, prismaClient = prisma) {
+    const stringEntityId = String(entityId);
     return prismaClient.translation.findMany({
-      where: { entity_type: entityType, entity_id: entityId },
+      where: { entity_type: entityType, entity_id: stringEntityId },
       select: { field: true, language_code: true, value: true },
     });
   },
@@ -61,14 +62,15 @@ const translationRepository = {
    * USE: Fetches all translation records for a batch of entities.
    *
    * @param {string} entityType — e.g. "NOTIFICATION"
-   * @param {Array<number>} entityIds — array of integer PKs
+   * @param {Array<string|number>} entityIds — array of identifier PKs
    * @param {object} [prismaClient=prisma] — Prisma client instance
-   * @returns {Promise<Array<{ entity_id: number, field: string, language_code: string, value: string }>>}
+   * @returns {Promise<Array<{ entity_id: string, field: string, language_code: string, value: string }>>}
    */
   async findManyByEntities(entityType, entityIds, prismaClient = prisma) {
     if (!entityIds || entityIds.length === 0) return [];
+    const stringIds = entityIds.map((id) => String(id));
     return prismaClient.translation.findMany({
-      where: { entity_type: entityType, entity_id: { in: entityIds } },
+      where: { entity_type: entityType, entity_id: { in: stringIds } },
       select: { entity_id: true, field: true, language_code: true, value: true },
     });
   },
@@ -79,12 +81,13 @@ const translationRepository = {
    * USE: Upserts translation entries for entity fields across languages.
    *
    * @param {string} entityType — e.g. "DOCUMENT"
-   * @param {number} entityId — integer PK of entity
+   * @param {string|number} entityId — identifier PK of entity
    * @param {object} fields — { fieldName: { languageCode: value } }
    * @param {object} [prismaClient=prisma] — Prisma client instance
    * @returns {Promise<void>}
    */
   async upsertFieldTranslations(entityType, entityId, fields, prismaClient = prisma) {
+    const stringEntityId = String(entityId);
     const operations = [];
 
     for (const [field, langMap] of Object.entries(fields)) {
@@ -96,12 +99,12 @@ const translationRepository = {
             where: {
               entity_type_entity_id_field_language_code: {
                 entity_type: entityType,
-                entity_id: entityId,
+                entity_id: stringEntityId,
                 field,
                 language_code: languageCode,
               },
             },
-            create: { entity_type: entityType, entity_id: entityId, field, language_code: languageCode, value: String(value) },
+            create: { entity_type: entityType, entity_id: stringEntityId, field, language_code: languageCode, value: String(value) },
             update: { value: String(value) },
           }),
         );
@@ -119,13 +122,14 @@ const translationRepository = {
    * USE: Removes all translation records for a given entity.
    *
    * @param {string} entityType — e.g. "DOCUMENT"
-   * @param {number} entityId — integer PK of entity
+   * @param {string|number} entityId — identifier PK of entity
    * @param {object} [prismaClient=prisma] — Prisma client instance
    * @returns {Promise<object>}
    */
   async deleteByEntity(entityType, entityId, prismaClient = prisma) {
+    const stringEntityId = String(entityId);
     return prismaClient.translation.deleteMany({
-      where: { entity_type: entityType, entity_id: entityId },
+      where: { entity_type: entityType, entity_id: stringEntityId },
     });
   },
 };

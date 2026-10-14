@@ -26,13 +26,14 @@
 
 const Joi = require('joi');
 const ApiError = require('../../core/utils/ApiError');
+const { cuidSchema, cuidRequired, cuidOptional } = require('../../core/utils/idValidation');
 
 const FAQ_CATEGORIES = ['COMPANY', 'PRODUCT', 'DISTRIBUTION'];
 
 const listQuerySchema = Joi.object({
   category: Joi.string().valid(...FAQ_CATEGORIES).optional(),
-  product: Joi.number().integer().positive().optional(),
-  product_id: Joi.number().integer().positive().optional(),
+  product: cuidOptional,
+  product_id: cuidOptional,
   lang: Joi.string().max(10).default('en'),
   page: Joi.number().integer().min(1).default(1),
   pageSize: Joi.number().integer().min(1).max(100).default(20),
@@ -66,7 +67,7 @@ function validateListQuery(query) {
 }
 
 const createFaqSchema = Joi.object({
-  product_id: Joi.number().integer().positive().allow(null).optional(),
+  product_id: cuidOptional,
   category: Joi.string().valid(...FAQ_CATEGORIES).required(),
   sort_order: Joi.number().integer().default(0),
   is_published: Joi.boolean().default(false),
@@ -75,7 +76,7 @@ const createFaqSchema = Joi.object({
 });
 
 const updateFaqSchema = Joi.object({
-  product_id: Joi.number().integer().positive().allow(null).optional(),
+  product_id: cuidOptional,
   category: Joi.string().valid(...FAQ_CATEGORIES).optional(),
   sort_order: Joi.number().integer().optional(),
   is_published: Joi.boolean().optional(),

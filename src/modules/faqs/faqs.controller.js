@@ -67,9 +67,9 @@ const faqsController = {
   },
 
   async adminGetById(req, res) {
-    const id = parseInt(req.params.id, 10);
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const lang = req.query.lang || 'en';
-    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
     
     const faq = await faqsService.getAdminFaqById(id, lang);
     return ApiResponse.success(res, faq);
@@ -82,8 +82,8 @@ const faqsController = {
   },
 
   async adminUpdate(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const data = require('./faqs.validation').validateUpdateFaq(req.body);
     
     const faq = await faqsService.updateFaq(id, data, req.auditContext);

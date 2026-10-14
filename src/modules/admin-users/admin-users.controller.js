@@ -49,8 +49,8 @@ const adminUsersController = {
    * @param {import('express').Response} res
    */
   async getById(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid admin user ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const adminUser = await adminUsersService.getAdminUserById(id);
     return ApiResponse.success(res, adminUser);
   },
@@ -79,8 +79,8 @@ const adminUsersController = {
    * @param {import('express').Response} res
    */
   async update(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw ApiError.validation('Invalid admin user ID.');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const adminUser = await adminUsersService.updateAdminUser(id, req.body, req.auditContext);
     return ApiResponse.success(res, adminUser);
   },

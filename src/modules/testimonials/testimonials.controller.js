@@ -67,8 +67,8 @@ const testimonialsController = {
   },
 
   async adminGetById(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     
     const testimonial = await testimonialsService.getAdminTestimonialById(id);
     return ApiResponse.success(res, testimonial);
@@ -81,8 +81,8 @@ const testimonialsController = {
   },
 
   async adminUpdate(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const data = require('./testimonials.validation').validateUpdateTestimonial(req.body);
     
     const testimonial = await testimonialsService.updateTestimonial(id, data, req.auditContext);

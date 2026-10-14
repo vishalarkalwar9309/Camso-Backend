@@ -28,6 +28,8 @@
 const Joi = require('joi');
 const ApiError = require('../../core/utils/ApiError');
 
+const { cuidSchema, cuidRequired, cuidOptional } = require('../../core/utils/idValidation');
+
 const DOCUMENT_TYPES = [
   'CATALOGUE',
   'BROCHURE',
@@ -39,10 +41,10 @@ const DOCUMENT_TYPES = [
 ];
 
 const listQuerySchema = Joi.object({
-  product: Joi.number().integer().positive().optional(),
-  product_id: Joi.number().integer().positive().optional(),
-  category: Joi.number().integer().positive().optional(),
-  category_id: Joi.number().integer().positive().optional(),
+  product: cuidOptional,
+  product_id: cuidOptional,
+  category: cuidOptional,
+  category_id: cuidOptional,
   type: Joi.string().valid(...DOCUMENT_TYPES).optional(),
   document_type: Joi.string().valid(...DOCUMENT_TYPES).optional(),
   lang: Joi.string().max(10).default('en'),
@@ -52,7 +54,7 @@ const listQuerySchema = Joi.object({
 });
 
 const detailParamsSchema = Joi.object({
-  id: Joi.number().integer().positive().required(),
+  id: cuidRequired,
 });
 
 const detailQuerySchema = Joi.object({
@@ -118,16 +120,16 @@ function validateDetailParams(params, query) {
 }
 
 const createDocumentSchema = Joi.object({
-  product_id: Joi.number().integer().positive().allow(null).optional(),
-  category_id: Joi.number().integer().positive().allow(null).optional(),
+  product_id: cuidOptional,
+  category_id: cuidOptional,
   document_type: Joi.string().valid(...DOCUMENT_TYPES).required(),
   is_published: Joi.boolean().default(false),
   title: Joi.string().max(255).required(), // English fallback title initially
 });
 
 const updateDocumentSchema = Joi.object({
-  product_id: Joi.number().integer().positive().allow(null).optional(),
-  category_id: Joi.number().integer().positive().allow(null).optional(),
+  product_id: cuidOptional,
+  category_id: cuidOptional,
   document_type: Joi.string().valid(...DOCUMENT_TYPES).optional(),
   is_published: Joi.boolean().optional(),
   title: Joi.string().max(255).optional(), // Default language title update

@@ -58,7 +58,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
     test('readiness endpoint remains functional', async () => {
       const res = await request(app).get('/api/v1/ready');
       expect([200, 503]).toContain(res.status);
-    });
+    }, 10000);
   });
 
   // ─── DOCUMENTS ────────────────────────────────────────────────────────────
@@ -103,11 +103,11 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
     test('handles parameter aliases (?product=, ?category=, ?type=)', async () => {
       documentsRepository.findPublishedDocuments.mockResolvedValue([0, []]);
 
-      const res = await request(app).get('/api/v1/documents?product=10&category=5&type=BROCHURE');
+      const res = await request(app).get('/api/v1/documents?product=cuid_product_0000000010&category=cuid_category_000000005&type=BROCHURE');
 
       expect(res.status).toBe(200);
       expect(documentsRepository.findPublishedDocuments).toHaveBeenCalledWith(
-        { product_id: 10, category_id: 5, document_type: 'BROCHURE' },
+        { product_id: 'cuid_product_0000000010', category_id: 'cuid_category_000000005', document_type: 'BROCHURE' },
         expect.anything(),
       );
     });
@@ -122,15 +122,15 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
   describe('GET /api/v1/documents/:id', () => {
     test('resolves document_files for requested language when present', async () => {
       const mockDoc = {
-        id: 1,
-        product_id: 10,
-        category_id: 2,
+        id: 'cuid_document_0000000001',
+        product_id: 'cuid_product_0000000010',
+        category_id: 'cuid_category_000000002',
         document_type: 'CATALOGUE',
         created_at: new Date(),
         updated_at: new Date(),
         files: [
-          { id: 100, language_code: 'en', is_offline_downloadable: true, media_asset: { id: 5, url: 'en.pdf' } },
-          { id: 101, language_code: 'fr', is_offline_downloadable: true, media_asset: { id: 6, url: 'fr.pdf' } },
+          { id: 'cuid_docfile_0000000001', language_code: 'en', is_offline_downloadable: true, media_asset: { id: 'cuid_media_0000000005', url: 'en.pdf' } },
+          { id: 'cuid_docfile_0000000002', language_code: 'fr', is_offline_downloadable: true, media_asset: { id: 'cuid_media_0000000006', url: 'fr.pdf' } },
         ],
       };
       documentsRepository.findPublishedDocumentById.mockResolvedValue(mockDoc);
@@ -138,7 +138,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
         { field: 'title', language_code: 'fr', value: 'Titre en Français' },
       ]);
 
-      const res = await request(app).get('/api/v1/documents/1?lang=fr');
+      const res = await request(app).get('/api/v1/documents/cuid_document_0000000001?lang=fr');
 
       expect(res.status).toBe(200);
       expect(res.body.data.title).toBe('Titre en Français');
@@ -148,20 +148,20 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
 
     test('returns empty files array when requested language document file is unavailable', async () => {
       const mockDoc = {
-        id: 1,
-        product_id: 10,
-        category_id: 2,
+        id: 'cuid_document_0000000001',
+        product_id: 'cuid_product_0000000010',
+        category_id: 'cuid_category_000000002',
         document_type: 'CATALOGUE',
         created_at: new Date(),
         updated_at: new Date(),
         files: [
-          { id: 100, language_code: 'en', is_offline_downloadable: true, media_asset: { id: 5, url: 'en.pdf' } },
+          { id: 'cuid_docfile_0000000001', language_code: 'en', is_offline_downloadable: true, media_asset: { id: 'cuid_media_0000000005', url: 'en.pdf' } },
         ],
       };
       documentsRepository.findPublishedDocumentById.mockResolvedValue(mockDoc);
       translationRepository.findByEntity.mockResolvedValue([]);
 
-      const res = await request(app).get('/api/v1/documents/1?lang=de');
+      const res = await request(app).get('/api/v1/documents/cuid_document_0000000001?lang=de');
 
       expect(res.status).toBe(200);
       expect(res.body.data.files).toEqual([]);
@@ -169,22 +169,22 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
 
     test('filters out non-matching language files when multiple language files exist', async () => {
       const mockDoc = {
-        id: 1,
-        product_id: 10,
-        category_id: 2,
+        id: 'cuid_document_0000000001',
+        product_id: 'cuid_product_0000000010',
+        category_id: 'cuid_category_000000002',
         document_type: 'MANUAL',
         created_at: new Date(),
         updated_at: new Date(),
         files: [
-          { id: 100, language_code: 'en', is_offline_downloadable: true, media_asset: { id: 5, url: 'en.pdf' } },
-          { id: 101, language_code: 'es', is_offline_downloadable: true, media_asset: { id: 6, url: 'es.pdf' } },
-          { id: 102, language_code: 'ja', is_offline_downloadable: true, media_asset: { id: 7, url: 'ja.pdf' } },
+          { id: 'cuid_docfile_0000000001', language_code: 'en', is_offline_downloadable: true, media_asset: { id: 'cuid_media_0000000005', url: 'en.pdf' } },
+          { id: 'cuid_docfile_0000000002', language_code: 'es', is_offline_downloadable: true, media_asset: { id: 'cuid_media_0000000006', url: 'es.pdf' } },
+          { id: 'cuid_docfile_0000000003', language_code: 'ja', is_offline_downloadable: true, media_asset: { id: 'cuid_media_0000000007', url: 'ja.pdf' } },
         ],
       };
       documentsRepository.findPublishedDocumentById.mockResolvedValue(mockDoc);
       translationRepository.findByEntity.mockResolvedValue([]);
 
-      const res = await request(app).get('/api/v1/documents/1?lang=es');
+      const res = await request(app).get('/api/v1/documents/cuid_document_0000000001?lang=es');
 
       expect(res.status).toBe(200);
       expect(res.body.data.files).toHaveLength(1);
@@ -195,7 +195,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
     test('returns 404 NOT_FOUND for unpublished document', async () => {
       documentsRepository.findPublishedDocumentById.mockResolvedValue(null);
 
-      const res = await request(app).get('/api/v1/documents/99');
+      const res = await request(app).get('/api/v1/documents/cuid_document_0000000099');
       expect(res.status).toBe(404);
       expect(res.body.error.type).toBe('NOT_FOUND');
     });
@@ -207,11 +207,11 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
     test('returns 200 with default created_at:desc sorting and handles query aliases (?product= & ?type=)', async () => {
       testimonialsRepository.findPublishedTestimonials.mockResolvedValue([0, []]);
 
-      const res = await request(app).get('/api/v1/testimonials?product=12&type=SOLIDS&sort=-created_at');
+      const res = await request(app).get('/api/v1/testimonials?product=cuid_product_0000000012&type=SOLIDS&sort=-created_at');
 
       expect(res.status).toBe(200);
       expect(testimonialsRepository.findPublishedTestimonials).toHaveBeenCalledWith(
-        { product_id: 12, story_type: 'SOLIDS' },
+        { product_id: 'cuid_product_0000000012', story_type: 'SOLIDS' },
         expect.objectContaining({ sort: '-created_at' }),
       );
     });
@@ -229,11 +229,11 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
     test('returns 200 with default sort_order:asc sorting and handles aliases (?product= & ?category=)', async () => {
       faqsRepository.findPublishedFaqs.mockResolvedValue([0, []]);
 
-      const res = await request(app).get('/api/v1/faqs?category=COMPANY&product=15');
+      const res = await request(app).get('/api/v1/faqs?category=COMPANY&product=cuid_product_0000000015');
 
       expect(res.status).toBe(200);
       expect(faqsRepository.findPublishedFaqs).toHaveBeenCalledWith(
-        { category: 'COMPANY', product_id: 15 },
+        { category: 'COMPANY', product_id: 'cuid_product_0000000015' },
         expect.objectContaining({ sort: 'sort_order:asc' }),
       );
     });

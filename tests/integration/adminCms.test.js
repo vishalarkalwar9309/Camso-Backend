@@ -9,20 +9,23 @@ describe('Admin CMS Integration Tests (Documents, Testimonials, FAQs)', () => {
   let contentAdminToken;
   let viewerToken;
   let marketingToken;
-  let adminUserId = 1;
+  let adminUserId = 'cuid_admin_user_001';
+  let contentAdminId = 'cuid_admin_user_002';
+  let viewerId = 'cuid_admin_user_003';
+  let marketingId = 'cuid_admin_user_004';
 
   beforeAll(async () => {
     // Generate valid JWTs for various admin roles
     const superPair = tokenService.generateTokenPair({ id: adminUserId, type: 'ADMIN', role: 'SUPER_ADMIN' });
     superAdminToken = superPair.accessToken;
 
-    const contentPair = tokenService.generateTokenPair({ id: 2, type: 'ADMIN', role: 'CONTENT_ADMIN' });
+    const contentPair = tokenService.generateTokenPair({ id: contentAdminId, type: 'ADMIN', role: 'CONTENT_ADMIN' });
     contentAdminToken = contentPair.accessToken;
 
-    const viewerPair = tokenService.generateTokenPair({ id: 3, type: 'ADMIN', role: 'VIEWER' });
+    const viewerPair = tokenService.generateTokenPair({ id: viewerId, type: 'ADMIN', role: 'VIEWER' });
     viewerToken = viewerPair.accessToken;
 
-    const marketingPair = tokenService.generateTokenPair({ id: 4, type: 'ADMIN', role: 'MARKETING' });
+    const marketingPair = tokenService.generateTokenPair({ id: marketingId, type: 'ADMIN', role: 'MARKETING' });
     marketingToken = marketingPair.accessToken;
 
     // Seed Language for translations
@@ -46,17 +49,17 @@ describe('Admin CMS Integration Tests (Documents, Testimonials, FAQs)', () => {
     await prisma.adminUser.upsert({
       where: { email: 'content@example.com' },
       update: {},
-      create: { id: 2, email: 'content@example.com', password_hash: 'hash', role: 'CONTENT_ADMIN' }
+      create: { id: contentAdminId, email: 'content@example.com', password_hash: 'hash', role: 'CONTENT_ADMIN' }
     });
     await prisma.adminUser.upsert({
       where: { email: 'viewer@example.com' },
       update: {},
-      create: { id: 3, email: 'viewer@example.com', password_hash: 'hash', role: 'VIEWER' }
+      create: { id: viewerId, email: 'viewer@example.com', password_hash: 'hash', role: 'VIEWER' }
     });
     await prisma.adminUser.upsert({
       where: { email: 'marketing@example.com' },
       update: {},
-      create: { id: 4, email: 'marketing@example.com', password_hash: 'hash', role: 'MARKETING' }
+      create: { id: marketingId, email: 'marketing@example.com', password_hash: 'hash', role: 'MARKETING' }
     });
   });
 

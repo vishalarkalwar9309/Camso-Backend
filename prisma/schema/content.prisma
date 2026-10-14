@@ -77,7 +77,7 @@ enum AdminRole {
 }
 
 model AdminUser {
-  id            Int       @id @default(autoincrement())
+  id            String    @id @default(cuid())
   email         String    @unique @db.VarChar(255)
   password_hash String    @db.VarChar(255)
   is_active     Boolean   @default(true)
@@ -117,7 +117,7 @@ enum DocumentType {
  *      Actual files are linked via DocumentFile.
  *
  * CONTAINS:
- *   id            — Auto-increment PK.
+ *   id            — CUID PK.
  *   product_id    — Optional FK to products (Vishal's table). Nullable for non-product docs.
  *   category_id   — Optional FK to categories (Vishal's table). Nullable.
  *   document_type — Type of document (enum).
@@ -134,11 +134,12 @@ enum DocumentType {
  * AUDIT: PUBLISH/UNPUBLISH/UPDATE events written by documents.service.js.
  */
 model Document {
-  id            Int          @id @default(autoincrement())
-  product_id    Int?
-  category_id   Int?
+  id            String       @id @default(cuid())
+  product_id    String?
+  category_id   String?
   document_type DocumentType
   is_published  Boolean      @default(false)
+  download_count Int         @default(0)
   created_at    DateTime     @default(now())
   updated_at    DateTime     @updatedAt
 
@@ -157,7 +158,7 @@ model Document {
  *      One document can have one file per language.
  *
  * CONTAINS:
- *   id                   — Auto-increment PK.
+ *   id                   — CUID PK.
  *   document_id          — FK to Document.
  *   language_code        — FK to Language (which language this file is for).
  *   media_asset_id       — FK to MediaAsset (the uploaded file record).
@@ -168,10 +169,10 @@ model Document {
  *   files per language per document.
  */
 model DocumentFile {
-  id                    Int      @id @default(autoincrement())
-  document_id           Int
+  id                    String   @id @default(cuid())
+  document_id           String
   language_code         String   @db.VarChar(10)
-  media_asset_id        Int
+  media_asset_id        String
   is_offline_downloadable Boolean @default(false)
 
   document    Document   @relation(fields: [document_id], references: [id])
@@ -211,16 +212,16 @@ enum StoryType {
  *   updated_at     — Last modification timestamp.
  */
 model Testimonial {
-  id             Int       @id @default(autoincrement())
-  product_id     Int?
-  customer_name  String    @db.VarChar(255)
-  region         String    @db.VarChar(100)
+  id             String      @id @default(cuid())
+  product_id     String?
+  customer_name  String      @db.VarChar(255)
+  region         String      @db.VarChar(100)
   story_type     StoryType
-  content        String    @db.Text
-  media_asset_id Int?
-  is_published   Boolean   @default(false)
-  created_at     DateTime  @default(now())
-  updated_at     DateTime  @updatedAt
+  content        String      @db.Text
+  media_asset_id String?
+  is_published   Boolean     @default(false)
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
 
   media_asset MediaAsset? @relation(fields: [media_asset_id], references: [id])
 
@@ -247,7 +248,7 @@ enum FaqCategory {
  *      the Translation table (entity_type="FAQ", fields: "question", "answer").
  *
  * CONTAINS:
- *   id           — Auto-increment PK.
+ *   id           — CUID PK.
  *   product_id   — Optional FK to products.
  *   category     — FAQ category (enum).
  *   sort_order   — Display order within category. Lower = displayed first.
@@ -256,8 +257,8 @@ enum FaqCategory {
  *   updated_at   — Last modification timestamp.
  */
 model Faq {
-  id           Int         @id @default(autoincrement())
-  product_id   Int?
+  id           String      @id @default(cuid())
+  product_id   String?
   category     FaqCategory
   sort_order   Int         @default(0)
   is_published Boolean     @default(false)
@@ -286,7 +287,7 @@ enum DealerType {
  *      Haversine distance calculated in SQL at query time — no PostGIS.
  *
  * CONTAINS:
- *   id        — Auto-increment PK.
+ *   id        — CUID PK.
  *   name      — Dealer/distributor business name.
  *   type      — DEALER or DISTRIBUTOR.
  *   address   — Street address.
@@ -305,7 +306,7 @@ enum DealerType {
  *   not CMS content. This distinction is documented in the master plan.
  */
 model Dealer {
-  id        Int        @id @default(autoincrement())
+  id        String     @id @default(cuid())
   name      String     @db.VarChar(255)
   type      DealerType
   address   String     @db.Text
@@ -342,7 +343,7 @@ enum FeedbackBucket {
  *      No hard delete — records are retained for analytics.
  *
  * CONTAINS:
- *   id         — Auto-increment PK.
+ *   id         — CUID PK.
  *   user_id    — Optional FK to users (nullable for guest sessions).
  *   device_id  — Client device identifier.
  *   product_id — Optional FK to products.
@@ -356,10 +357,10 @@ enum FeedbackBucket {
  *   Queried cross-domain via Aary's own repository.
  */
 model Feedback {
-  id         Int            @id @default(autoincrement())
-  user_id    Int?
+  id         String         @id @default(cuid())
+  user_id    String?
   device_id  String         @db.VarChar(255)
-  product_id Int?
+  product_id String?
   bucket     FeedbackBucket
   rating     Int
   comment    String?        @db.Text
@@ -381,12 +382,12 @@ model Feedback {
  *      Keys: "about", "contact", "legal", "settings".
  *
  * CONTAINS:
- *   id    — Auto-increment PK.
+ *   id    — CUID PK.
  *   key   — Unique slug for the content page.
  *   extra — Optional JSONB for structured supplementary data.
  */
 model AppContent {
-  id    Int     @id @default(autoincrement())
+  id    String  @id @default(cuid())
   key   String  @unique @db.VarChar(50)
   extra Json?
 

@@ -105,8 +105,8 @@ const documentsController = {
   },
 
   async adminUpdate(req, res) {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const data = require('./documents.validation').validateUpdateDocument(req.body);
     
     const document = await documentsService.updateDocument(id, data, req.auditContext);
@@ -114,9 +114,9 @@ const documentsController = {
   },
 
   async adminUploadFile(req, res) {
-    const id = parseInt(req.params.id, 10);
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
     const languageCode = req.body.language_code || 'en';
-    if (isNaN(id)) throw require('../../core/utils/ApiError').validation('Invalid ID');
     if (!req.file) throw require('../../core/utils/ApiError').validation('No file uploaded');
 
     const docFile = await documentsService.uploadDocumentFile(id, req.file, languageCode, req.admin.id, req.auditContext);

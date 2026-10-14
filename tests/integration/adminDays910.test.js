@@ -56,16 +56,16 @@ describe('Days 9–10 Admin Integration Tests', () => {
 
   beforeAll(async () => {
     // Generate valid JWTs
-    superAdminToken = tokenService.generateTokenPair({ id: 1, type: 'ADMIN', role: 'SUPER_ADMIN' }).accessToken;
-    contentAdminToken = tokenService.generateTokenPair({ id: 2, type: 'ADMIN', role: 'CONTENT_ADMIN' }).accessToken;
-    viewerToken = tokenService.generateTokenPair({ id: 3, type: 'ADMIN', role: 'VIEWER' }).accessToken;
-    marketingToken = tokenService.generateTokenPair({ id: 4, type: 'ADMIN', role: 'MARKETING' }).accessToken;
+    superAdminToken = tokenService.generateTokenPair({ id: 'cuid_admin_user_001', type: 'ADMIN', role: 'SUPER_ADMIN' }).accessToken;
+    contentAdminToken = tokenService.generateTokenPair({ id: 'cuid_admin_user_002', type: 'ADMIN', role: 'CONTENT_ADMIN' }).accessToken;
+    viewerToken = tokenService.generateTokenPair({ id: 'cuid_admin_user_003', type: 'ADMIN', role: 'VIEWER' }).accessToken;
+    marketingToken = tokenService.generateTokenPair({ id: 'cuid_admin_user_004', type: 'ADMIN', role: 'MARKETING' }).accessToken;
 
     // Seed admin users in DB (required for adminGuard is_active check)
-    await prisma.adminUser.upsert({ where: { email: 'admin@example.com' }, update: {}, create: { id: 1, email: 'admin@example.com', password_hash: 'hash', role: 'SUPER_ADMIN' } });
-    await prisma.adminUser.upsert({ where: { email: 'content@example.com' }, update: {}, create: { id: 2, email: 'content@example.com', password_hash: 'hash', role: 'CONTENT_ADMIN' } });
-    await prisma.adminUser.upsert({ where: { email: 'viewer@example.com' }, update: {}, create: { id: 3, email: 'viewer@example.com', password_hash: 'hash', role: 'VIEWER' } });
-    await prisma.adminUser.upsert({ where: { email: 'marketing@example.com' }, update: {}, create: { id: 4, email: 'marketing@example.com', password_hash: 'hash', role: 'MARKETING' } });
+    await prisma.adminUser.upsert({ where: { email: 'admin@example.com' }, update: {}, create: { id: 'cuid_admin_user_001', email: 'admin@example.com', password_hash: 'hash', role: 'SUPER_ADMIN' } });
+    await prisma.adminUser.upsert({ where: { email: 'content@example.com' }, update: {}, create: { id: 'cuid_admin_user_002', email: 'content@example.com', password_hash: 'hash', role: 'CONTENT_ADMIN' } });
+    await prisma.adminUser.upsert({ where: { email: 'viewer@example.com' }, update: {}, create: { id: 'cuid_admin_user_003', email: 'viewer@example.com', password_hash: 'hash', role: 'VIEWER' } });
+    await prisma.adminUser.upsert({ where: { email: 'marketing@example.com' }, update: {}, create: { id: 'cuid_admin_user_004', email: 'marketing@example.com', password_hash: 'hash', role: 'MARKETING' } });
 
     // Clean up any test-specific admin users from previous runs
     await prisma.adminUser.deleteMany({ where: { email: { contains: '@camso.test' } } });
