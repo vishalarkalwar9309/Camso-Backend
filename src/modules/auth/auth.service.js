@@ -163,6 +163,10 @@ async function login({ email, password }) {
     throw ApiError.unauthorized(INVALID_MSG);
   }
 
+  if (user.is_active === false) {
+    throw ApiError.forbidden('Account is deactivated. Please contact support.');
+  }
+
   const passwordMatch = await comparePassword(password, user.password_hash);
   if (!passwordMatch) {
     throw ApiError.unauthorized(INVALID_MSG);
@@ -226,4 +230,20 @@ async function refresh({ refresh_token: rawToken }) {
   };
 }
 
-module.exports = { guestSignIn, register, login, refresh };
+/**
+ * Log out by revoking the given refresh token.
+ *
+ * @param {{ refresh_token: string }} body
+ * @returns {Promise<{ message: string }>}
+ */
+async function logout({ refresh_token: rawToken }) {
+  if (!rawToken) {
+    throw ApiError.badRequest('refresh_token is required for logout.');
+  }
+  const tokenHash = hashRefreshToken(rawToken);
+  await repo.revokeRefreshToken(tokenHash);
+  return { message: 'Logged out successfully.' };
+}
+
+module.exports = { guestSignIn, register, login, refresh, logout };
+

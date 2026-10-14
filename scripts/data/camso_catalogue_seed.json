@@ -1,0 +1,1028 @@
+{
+  "_metadata": {
+    "source": "Vira711/CAMSO-APP (lib/data/mock_data.dart)",
+    "environment": "development_test_fixture",
+    "extracted_at": "2026-10-13T14:49:00Z",
+    "disclaimer": "This dataset contains development and test fixture data extracted from the Launch 1 Flutter prototype. Product PIDs, names, dimensions, and specifications represent authentic CAMSO product line attributes created for the prototype. Image URLs are Unsplash demonstration placeholders and ratings/review counts are prototype mock values. Not for production use without verified CEAT data.",
+    "category_count": 6,
+    "product_count": 7
+  },
+  "categories": [
+    {
+      "source_id": "cat-1",
+      "slug": "skid-steer",
+      "name": "Skid Steer Tires",
+      "description": "Heavy-duty tires for skid steer loaders and compact equipment operating on abrasive and mixed surfaces.",
+      "icon_url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop&auto=format",
+      "sort_order": 1,
+      "is_active": true,
+      "icon_is_prototype_placeholder": true
+    },
+    {
+      "source_id": "cat-2",
+      "slug": "telehandler",
+      "name": "Telehandler Tires",
+      "description": "Premium radial and bias tires providing maximum stability and load capacity for telehandlers and material handlers.",
+      "icon_url": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=300&h=200&fit=crop&auto=format",
+      "sort_order": 2,
+      "is_active": true,
+      "icon_is_prototype_placeholder": true
+    },
+    {
+      "source_id": "cat-3",
+      "slug": "rubber-tracks",
+      "name": "Rubber Tracks",
+      "description": "High-durability continuous steel cord rubber tracks for compact track loaders and multi-terrain loaders.",
+      "icon_url": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=300&h=200&fit=crop&auto=format",
+      "sort_order": 3,
+      "is_active": true,
+      "icon_is_prototype_placeholder": true
+    },
+    {
+      "source_id": "cat-4",
+      "slug": "steel-tracks",
+      "name": "Steel Tracks",
+      "description": "Heavy-duty steel track assemblies for demanding demolition and extreme abrasive ground conditions.",
+      "icon_url": "https://images.unsplash.com/photo-1656797654768-f3b5883a0fbf?w=300&h=200&fit=crop&auto=format",
+      "sort_order": 4,
+      "is_active": true,
+      "icon_is_prototype_placeholder": true
+    },
+    {
+      "source_id": "cat-5",
+      "slug": "backhoe",
+      "name": "Backhoe Tires",
+      "description": "All-terrain multi-purpose tires for backhoe loaders delivering high traction in dirt and smooth roading.",
+      "icon_url": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=300&h=200&fit=crop&auto=format",
+      "sort_order": 5,
+      "is_active": true,
+      "icon_is_prototype_placeholder": true
+    },
+    {
+      "source_id": "cat-6",
+      "slug": "excavator",
+      "name": "Excavator Tracks",
+      "description": "Precision-engineered rubber and hybrid tracks for mini and midi excavators with low ground disturbance.",
+      "icon_url": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=300&h=200&fit=crop&auto=format",
+      "sort_order": 6,
+      "is_active": true,
+      "icon_is_prototype_placeholder": true
+    }
+  ],
+  "products": [
+    {
+      "source_id": "p001",
+      "pid": "SKS-S1-10-16.5",
+      "category_slug": "skid-steer",
+      "name": "SKS S1 Skid Steer Tire",
+      "slug": "sks-s1-skid-steer-tire-sks-s1-10-16.5",
+      "description": "Heavy-duty skid steer tire engineered for superior traction on mixed terrain. The aggressive tread pattern is optimized for muddy, rocky, and paved surfaces delivering outstanding durability in demanding construction environments.",
+      "is_active": true,
+      "image": {
+        "url": "https://images.unsplash.com/photo-1763516763181-4372f2987360?w=600&h=600&fit=crop&auto=format",
+        "is_primary": true,
+        "sort_order": 0,
+        "is_prototype_placeholder": true
+      },
+      "specifications": [
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Size",
+          "spec_value": "10-16.5",
+          "is_filterable": true,
+          "sort_order": 1
+        },
+        {
+          "spec_type": "SPECIFICATION",
+          "spec_key": "Ply Rating",
+          "spec_value": "10PR",
+          "is_filterable": true,
+          "sort_order": 2
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Depth",
+          "spec_value": "22mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 3
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Load Index",
+          "spec_value": "F (12-ply)",
+          "is_filterable": false,
+          "sort_order": 4
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Load",
+          "spec_value": "2,630 kg",
+          "unit": "kg",
+          "is_filterable": true,
+          "sort_order": 5
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Speed",
+          "spec_value": "40 km/h",
+          "unit": "km/h",
+          "is_filterable": false,
+          "sort_order": 6
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Overall Diameter",
+          "spec_value": "680 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 7
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Section Width",
+          "spec_value": "267 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 8
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Rim Diameter",
+          "spec_value": "16.5\"",
+          "unit": "in",
+          "is_filterable": true,
+          "sort_order": 9
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Width",
+          "spec_value": "225 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 10
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Static Radius",
+          "spec_value": "308 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 11
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Weight",
+          "spec_value": "28.5 kg",
+          "unit": "kg",
+          "is_filterable": false,
+          "sort_order": 12
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Rim Flange",
+          "spec_value": "8.25 in",
+          "unit": "in",
+          "is_filterable": false,
+          "sort_order": 13
+        }
+      ],
+      "_source_attributes": {
+        "features": [
+          "Deep tread design for maximum traction",
+          "Reinforced sidewalls resist cuts and impacts",
+          "Wide footprint for superior stability",
+          "Low heat buildup compound"
+        ],
+        "applications": [
+          "Skid Steer Loaders",
+          "Compact Track Loaders",
+          "Construction Sites",
+          "Urban Projects"
+        ],
+        "compatibleEquipment": [
+          "Bobcat S650",
+          "Caterpillar 262D3",
+          "Case SR270",
+          "John Deere 332G",
+          "Kubota SSV75"
+        ],
+        "isNew": true,
+        "isFeatured": true,
+        "rating": 4.7,
+        "reviewCount": 84,
+        "_prototype_warning": "Demonstration mock values from Launch 1 Flutter mock_data.dart; unverified for production."
+      }
+    },
+    {
+      "source_id": "p002",
+      "pid": "MH701-460-70R24",
+      "category_slug": "telehandler",
+      "name": "MH 701 Telehandler Tire",
+      "slug": "mh-701-telehandler-tire-mh701-460-70r24",
+      "description": "Premium radial telehandler tire providing exceptional stability for telescopic handlers in lifting applications. Optimized for mixed on-road and off-road use with low rolling resistance and high load capacity.",
+      "is_active": true,
+      "image": {
+        "url": "https://images.unsplash.com/photo-1742070122920-3480a94cfbbb?w=600&h=600&fit=crop&auto=format",
+        "is_primary": true,
+        "sort_order": 0,
+        "is_prototype_placeholder": true
+      },
+      "specifications": [
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Size",
+          "spec_value": "460/70R24",
+          "is_filterable": true,
+          "sort_order": 1
+        },
+        {
+          "spec_type": "SPECIFICATION",
+          "spec_key": "Ply Rating",
+          "spec_value": "16PR",
+          "is_filterable": true,
+          "sort_order": 2
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Depth",
+          "spec_value": "25mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 3
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Load Index",
+          "spec_value": "B (159A8)",
+          "is_filterable": false,
+          "sort_order": 4
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Load",
+          "spec_value": "3,250 kg",
+          "unit": "kg",
+          "is_filterable": true,
+          "sort_order": 5
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Speed",
+          "spec_value": "50 km/h",
+          "unit": "km/h",
+          "is_filterable": false,
+          "sort_order": 6
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Overall Diameter",
+          "spec_value": "1080 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 7
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Section Width",
+          "spec_value": "468 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 8
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Rim Diameter",
+          "spec_value": "24\"",
+          "unit": "in",
+          "is_filterable": true,
+          "sort_order": 9
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Width",
+          "spec_value": "380 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 10
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Static Radius",
+          "spec_value": "521 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 11
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Weight",
+          "spec_value": "89.0 kg",
+          "unit": "kg",
+          "is_filterable": false,
+          "sort_order": 12
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Rim Flange",
+          "spec_value": "16 in",
+          "unit": "in",
+          "is_filterable": false,
+          "sort_order": 13
+        }
+      ],
+      "_source_attributes": {
+        "features": [
+          "Radial steel belt construction",
+          "Self-cleaning tread blocks",
+          "High load capacity design",
+          "Fuel-efficient low RR"
+        ],
+        "applications": [
+          "Telehandlers",
+          "Rough Terrain Forklifts",
+          "Material Handlers",
+          "Agricultural Use"
+        ],
+        "compatibleEquipment": [
+          "JCB 540-170",
+          "Manitou MT 1840",
+          "Merlo P72.10",
+          "Liebherr T 60-9"
+        ],
+        "isNew": false,
+        "isFeatured": true,
+        "rating": 4.5,
+        "reviewCount": 62,
+        "_prototype_warning": "Demonstration mock values from Launch 1 Flutter mock_data.dart; unverified for production."
+      }
+    },
+    {
+      "source_id": "p003",
+      "pid": "CTL400-400X86X52",
+      "category_slug": "rubber-tracks",
+      "name": "CTL 400 Rubber Track",
+      "slug": "ctl-400-rubber-track-ctl400-400x86x52",
+      "description": "High-performance rubber track for compact track loaders featuring steel cord reinforcement and an advanced rubber compound for extended service life.",
+      "is_active": true,
+      "image": {
+        "url": "https://images.unsplash.com/photo-1580901369227-308f6f40bdeb?w=600&h=600&fit=crop&auto=format",
+        "is_primary": true,
+        "sort_order": 0,
+        "is_prototype_placeholder": true
+      },
+      "specifications": [
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Size",
+          "spec_value": "400x86x52",
+          "is_filterable": true,
+          "sort_order": 1
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Width",
+          "spec_value": "400 mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 2
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Depth",
+          "spec_value": "30mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 3
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Load",
+          "spec_value": "4,500 kg",
+          "unit": "kg",
+          "is_filterable": true,
+          "sort_order": 4
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Speed",
+          "spec_value": "14 km/h",
+          "unit": "km/h",
+          "is_filterable": false,
+          "sort_order": 5
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Pitch",
+          "spec_value": "86 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 6
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Links",
+          "spec_value": "52",
+          "is_filterable": false,
+          "sort_order": 7
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Track Length",
+          "spec_value": "4,472 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 8
+        },
+        {
+          "spec_type": "SPECIFICATION",
+          "spec_key": "Lugs per Track",
+          "spec_value": "26",
+          "is_filterable": false,
+          "sort_order": 9
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Weight",
+          "spec_value": "148.0 kg",
+          "unit": "kg",
+          "is_filterable": false,
+          "sort_order": 10
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Sag",
+          "spec_value": "25–40 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 11
+        }
+      ],
+      "_source_attributes": {
+        "features": [
+          "Triple steel cord reinforcement",
+          "Bolt-on drive lugs",
+          "Low ground pressure design",
+          "Excellent surface protection"
+        ],
+        "applications": [
+          "Compact Track Loaders",
+          "Pipeline Construction",
+          "Landscaping",
+          "Soft Ground Operations"
+        ],
+        "compatibleEquipment": [
+          "Bobcat T870",
+          "Caterpillar 287D3",
+          "Case TV620B",
+          "Kubota SVL97-2"
+        ],
+        "isNew": true,
+        "isFeatured": false,
+        "rating": 4.8,
+        "reviewCount": 113,
+        "_prototype_warning": "Demonstration mock values from Launch 1 Flutter mock_data.dart; unverified for production."
+      }
+    },
+    {
+      "source_id": "p004",
+      "pid": "MPT653-335-80R18",
+      "category_slug": "backhoe",
+      "name": "MPT 653 Multi-Purpose Tire",
+      "slug": "mpt-653-multi-purpose-tire-mpt653-335-80r18",
+      "description": "Versatile multi-purpose tire for backhoe loaders requiring both on-road efficiency and off-road grip.",
+      "is_active": true,
+      "image": {
+        "url": "https://images.unsplash.com/photo-1541487880852-afcef8ba6d2c?w=600&h=600&fit=crop&auto=format",
+        "is_primary": true,
+        "sort_order": 0,
+        "is_prototype_placeholder": true
+      },
+      "specifications": [
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Size",
+          "spec_value": "335/80R18",
+          "is_filterable": true,
+          "sort_order": 1
+        },
+        {
+          "spec_type": "SPECIFICATION",
+          "spec_key": "Ply Rating",
+          "spec_value": "12PR",
+          "is_filterable": true,
+          "sort_order": 2
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Depth",
+          "spec_value": "20mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 3
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Load Index",
+          "spec_value": "F (143A8)",
+          "is_filterable": false,
+          "sort_order": 4
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Load",
+          "spec_value": "2,100 kg",
+          "unit": "kg",
+          "is_filterable": true,
+          "sort_order": 5
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Speed",
+          "spec_value": "65 km/h",
+          "unit": "km/h",
+          "is_filterable": false,
+          "sort_order": 6
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Overall Diameter",
+          "spec_value": "915 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 7
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Section Width",
+          "spec_value": "344 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 8
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Rim Diameter",
+          "spec_value": "18\"",
+          "unit": "in",
+          "is_filterable": true,
+          "sort_order": 9
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Width",
+          "spec_value": "280 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 10
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Static Radius",
+          "spec_value": "440 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 11
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Weight",
+          "spec_value": "54.0 kg",
+          "unit": "kg",
+          "is_filterable": false,
+          "sort_order": 12
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Rim Flange",
+          "spec_value": "11 in",
+          "unit": "in",
+          "is_filterable": false,
+          "sort_order": 13
+        }
+      ],
+      "_source_attributes": {
+        "features": [
+          "All-terrain pattern",
+          "Low road noise",
+          "Self-cleaning design",
+          "Excellent load distribution"
+        ],
+        "applications": [
+          "Backhoe Loaders",
+          "Road Construction",
+          "Urban Projects",
+          "Utility Work"
+        ],
+        "compatibleEquipment": [
+          "JCB 3CX",
+          "Caterpillar 420F2",
+          "Komatsu WB97R-8",
+          "Case 590SN"
+        ],
+        "isNew": false,
+        "isFeatured": true,
+        "rating": 4.3,
+        "reviewCount": 47,
+        "_prototype_warning": "Demonstration mock values from Launch 1 Flutter mock_data.dart; unverified for production."
+      }
+    },
+    {
+      "source_id": "p005",
+      "pid": "DFG303-300X52.5X84",
+      "category_slug": "excavator",
+      "name": "DFG 303 Mini Excavator Track",
+      "slug": "dfg-303-mini-excavator-track-dfg303-300x52.5x84",
+      "description": "Precision-engineered rubber track for mini excavators. Asymmetric lug pattern ensures excellent traction in confined spaces while minimizing surface damage.",
+      "is_active": true,
+      "image": {
+        "url": "https://images.unsplash.com/photo-1580901368919-7738efb0f87e?w=600&h=600&fit=crop&auto=format",
+        "is_primary": true,
+        "sort_order": 0,
+        "is_prototype_placeholder": true
+      },
+      "specifications": [
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Size",
+          "spec_value": "300x52.5x84",
+          "is_filterable": true,
+          "sort_order": 1
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Width",
+          "spec_value": "300 mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 2
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Depth",
+          "spec_value": "28mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 3
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Load",
+          "spec_value": "2,800 kg",
+          "unit": "kg",
+          "is_filterable": true,
+          "sort_order": 4
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Speed",
+          "spec_value": "5.5 km/h",
+          "unit": "km/h",
+          "is_filterable": false,
+          "sort_order": 5
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Pitch",
+          "spec_value": "52.5 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 6
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Links",
+          "spec_value": "84",
+          "is_filterable": false,
+          "sort_order": 7
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Track Length",
+          "spec_value": "4,410 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 8
+        },
+        {
+          "spec_type": "SPECIFICATION",
+          "spec_key": "Lugs per Track",
+          "spec_value": "42",
+          "is_filterable": false,
+          "sort_order": 9
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Weight",
+          "spec_value": "96.0 kg",
+          "unit": "kg",
+          "is_filterable": false,
+          "sort_order": 10
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Sag",
+          "spec_value": "20–35 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 11
+        }
+      ],
+      "_source_attributes": {
+        "features": [
+          "Asymmetric lug pattern",
+          "Anti-vibration compound",
+          "Enhanced guide protection",
+          "Detrack-resistant design"
+        ],
+        "applications": [
+          "Mini Excavators",
+          "Narrow Trenching",
+          "Landscaping",
+          "Basement Work"
+        ],
+        "compatibleEquipment": [
+          "Kubota KX060-5",
+          "Yanmar SV60",
+          "Takeuchi TB260",
+          "Hitachi ZX60-6"
+        ],
+        "isNew": false,
+        "isFeatured": false,
+        "rating": 4.6,
+        "reviewCount": 78,
+        "_prototype_warning": "Demonstration mock values from Launch 1 Flutter mock_data.dart; unverified for production."
+      }
+    },
+    {
+      "source_id": "p006",
+      "pid": "XTR770-12-16.5",
+      "category_slug": "skid-steer",
+      "name": "XTR 770 Extreme Terrain Tire",
+      "slug": "xtr-770-extreme-terrain-tire-xtr770-12-16.5",
+      "description": "Extreme duty skid steer tire built for the harshest quarry, demolition, and recycling applications.",
+      "is_active": true,
+      "image": {
+        "url": "https://images.unsplash.com/photo-1763515187944-821eaca2426b?w=600&h=600&fit=crop&auto=format",
+        "is_primary": true,
+        "sort_order": 0,
+        "is_prototype_placeholder": true
+      },
+      "specifications": [
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Size",
+          "spec_value": "12-16.5",
+          "is_filterable": true,
+          "sort_order": 1
+        },
+        {
+          "spec_type": "SPECIFICATION",
+          "spec_key": "Ply Rating",
+          "spec_value": "12PR",
+          "is_filterable": true,
+          "sort_order": 2
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Depth",
+          "spec_value": "27mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 3
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Load Index",
+          "spec_value": "G (14-ply)",
+          "is_filterable": false,
+          "sort_order": 4
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Load",
+          "spec_value": "3,150 kg",
+          "unit": "kg",
+          "is_filterable": true,
+          "sort_order": 5
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Speed",
+          "spec_value": "35 km/h",
+          "unit": "km/h",
+          "is_filterable": false,
+          "sort_order": 6
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Overall Diameter",
+          "spec_value": "730 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 7
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Section Width",
+          "spec_value": "308 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 8
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Rim Diameter",
+          "spec_value": "16.5\"",
+          "unit": "in",
+          "is_filterable": true,
+          "sort_order": 9
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Width",
+          "spec_value": "260 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 10
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Static Radius",
+          "spec_value": "342 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 11
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Weight",
+          "spec_value": "38.0 kg",
+          "unit": "kg",
+          "is_filterable": false,
+          "sort_order": 12
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Rim Flange",
+          "spec_value": "9.75 in",
+          "unit": "in",
+          "is_filterable": false,
+          "sort_order": 13
+        }
+      ],
+      "_source_attributes": {
+        "features": [
+          "Ultra-reinforced carcass",
+          "Rim guard protection",
+          "Deep void ratio 35%",
+          "Impact-resistant compound"
+        ],
+        "applications": [
+          "Quarry Operations",
+          "Demolition",
+          "Recycling Facilities",
+          "Mining Surface"
+        ],
+        "compatibleEquipment": [
+          "Bobcat S850",
+          "Caterpillar 272D3",
+          "Mustang 3800V",
+          "Gehl V420"
+        ],
+        "isNew": true,
+        "isFeatured": true,
+        "rating": 4.9,
+        "reviewCount": 31,
+        "_prototype_warning": "Demonstration mock values from Launch 1 Flutter mock_data.dart; unverified for production."
+      }
+    },
+    {
+      "source_id": "p007",
+      "pid": "STA550-450X83.5X71",
+      "category_slug": "steel-tracks",
+      "name": "STA 550 Steel Track Assembly",
+      "slug": "sta-550-steel-track-assembly-sta550-450x83.5x71",
+      "description": "Heavy-duty steel track assembly for large compact track loaders operating in extreme abrasive conditions.",
+      "is_active": true,
+      "image": {
+        "url": "https://images.unsplash.com/photo-1760197384870-183647c3d57b?w=600&h=600&fit=crop&auto=format",
+        "is_primary": true,
+        "sort_order": 0,
+        "is_prototype_placeholder": true
+      },
+      "specifications": [
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Size",
+          "spec_value": "450x83.5x71",
+          "is_filterable": true,
+          "sort_order": 1
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Width",
+          "spec_value": "450 mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 2
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Tread Depth",
+          "spec_value": "45mm",
+          "unit": "mm",
+          "is_filterable": true,
+          "sort_order": 3
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Load",
+          "spec_value": "8,000 kg",
+          "unit": "kg",
+          "is_filterable": true,
+          "sort_order": 4
+        },
+        {
+          "spec_type": "PERFORMANCE",
+          "spec_key": "Max Speed",
+          "spec_value": "8 km/h",
+          "unit": "km/h",
+          "is_filterable": false,
+          "sort_order": 5
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Pitch",
+          "spec_value": "83.5 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 6
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Links",
+          "spec_value": "71",
+          "is_filterable": false,
+          "sort_order": 7
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Track Length",
+          "spec_value": "5,929 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 8
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Pad Width",
+          "spec_value": "430 mm",
+          "unit": "mm",
+          "is_filterable": false,
+          "sort_order": 9
+        },
+        {
+          "spec_type": "DIMENSION",
+          "spec_key": "Weight",
+          "spec_value": "380.0 kg",
+          "unit": "kg",
+          "is_filterable": false,
+          "sort_order": 10
+        },
+        {
+          "spec_type": "SPECIFICATION",
+          "spec_key": "Shoe Type",
+          "spec_value": "Triple grouser",
+          "is_filterable": false,
+          "sort_order": 11
+        }
+      ],
+      "_source_attributes": {
+        "features": [
+          "Forged steel links",
+          "Replaceable rubber pads",
+          "Sealed joint system",
+          "Extended service intervals"
+        ],
+        "applications": [
+          "Large CTL Operations",
+          "Hard Rock Sites",
+          "Demolition Debris",
+          "Extreme Abrasion"
+        ],
+        "compatibleEquipment": [
+          "Caterpillar 299D3 XE",
+          "Bobcat T86",
+          "Doosan DL420",
+          "Volvo MCT145D"
+        ],
+        "isNew": false,
+        "isFeatured": false,
+        "rating": 4.4,
+        "reviewCount": 22,
+        "_prototype_warning": "Demonstration mock values from Launch 1 Flutter mock_data.dart; unverified for production."
+      }
+    }
+  ]
+}

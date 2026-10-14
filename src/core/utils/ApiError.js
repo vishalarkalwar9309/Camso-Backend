@@ -36,6 +36,10 @@ class ApiError extends Error {
     return new ApiError(400, 'VALIDATION_ERROR', message, details);
   }
 
+  static validation(message = 'Validation failed', details = []) {
+    return new ApiError(400, 'VALIDATION_ERROR', message, details);
+  }
+
   static unauthorized(message = 'Authentication required') {
     return new ApiError(401, 'UNAUTHORIZED', message);
   }
@@ -48,9 +52,14 @@ class ApiError extends Error {
     return new ApiError(404, 'NOT_FOUND', message);
   }
 
+  static conflict(message = 'Resource conflict') {
+    return new ApiError(409, 'CONFLICT', message);
+  }
+
   static internal(message = 'An unexpected error occurred') {
     return new ApiError(500, 'INTERNAL_ERROR', message);
   }
 }
+
 
 module.exports = ApiError;

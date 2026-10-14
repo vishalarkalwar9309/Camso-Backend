@@ -12,7 +12,7 @@
 
 const { Router } = require('express');
 const controller = require('./auth.controller');
-const { validate, guestSchema, registerSchema, loginSchema, refreshSchema } = require('./auth.validation');
+const { validate, guestSchema, registerSchema, loginSchema, refreshSchema, logoutSchema } = require('./auth.validation');
 
 const router = Router();
 
@@ -28,4 +28,8 @@ router.post('/login',    validate(loginSchema),     controller.login);
 // POST /api/v1/auth/refresh
 router.post('/refresh',  validate(refreshSchema),   controller.refreshToken);
 
+// POST /api/v1/auth/logout
+router.post('/logout',   validate(logoutSchema),    controller.logout);
+
 module.exports = router;
+

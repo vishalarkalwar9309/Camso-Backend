@@ -67,6 +67,26 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+// Root health and readiness probes (for container orchestrators / load balancers)
+const { checkReadiness } = require('./core/services/readinessService');
+app.get('/health', (req, res) => {
+  res.status(200).json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
+});
+app.get('/ready', async (req, res) => {
+  const { isReady, statusCode, result } = await checkReadiness();
+  if (isReady) {
+    return res.status(200).json({ success: true, data: result });
+  }
+  return res.status(statusCode).json({
+    success: false,
+    error: {
+      type: 'SERVICE_UNAVAILABLE',
+      message: 'Service is not ready to serve traffic.',
+      details: [result],
+    },
+  });
+});
+
 // 6. Application routes
 app.use('/api/v1', routes);
 

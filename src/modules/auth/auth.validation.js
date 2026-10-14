@@ -67,10 +67,16 @@ const refreshSchema = Joi.object({
   refresh_token: Joi.string().trim().required(),
 });
 
+const logoutSchema = Joi.object({
+  refresh_token: Joi.string().trim().required(),
+});
+
 module.exports = {
   validate,
   guestSchema,
   registerSchema,
   loginSchema,
   refreshSchema,
+  logoutSchema,
 };
+

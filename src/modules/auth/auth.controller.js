@@ -47,4 +47,14 @@ const refreshToken = asyncHandler(async (req, res) => {
   sendSuccess(res, tokens);
 });
 
-module.exports = { guest, register, login, refreshToken };
+/**
+ * POST /api/v1/auth/logout
+ */
+const logout = asyncHandler(async (req, res) => {
+  const result = await authService.logout(req.body);
+  sendSuccess(res, result, 200);
+});
+
+module.exports = { guest, register, login, refreshToken, logout };
+
+

@@ -180,6 +180,13 @@ async function rotateRefreshToken({ oldTokenId, newTokenData }) {
   ]);
 }
 
+async function revokeRefreshToken(tokenHash) {
+  return prisma.refreshToken.updateMany({
+    where: { token_hash: tokenHash, revoked_at: null },
+    data: { revoked_at: new Date() },
+  });
+}
+
 module.exports = {
   findUserByEmail,
   findUserById,
@@ -190,4 +197,6 @@ module.exports = {
   findRefreshTokenByHash,
   createRefreshToken,
   rotateRefreshToken,
+  revokeRefreshToken,
 };
+

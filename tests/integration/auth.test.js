@@ -20,13 +20,28 @@ const prisma  = require('../../src/config/database');
 // ---------------------------------------------------------------------------
 // DB availability gate
 // ---------------------------------------------------------------------------
+const { execFileSync } = require('child_process');
+const path = require('path');
+
 let dbAvailable = false;
+try {
+  execFileSync(process.execPath, [
+    '-e',
+    'require("./src/config/database").$connect().then(()=>process.exit(0)).catch(()=>process.exit(1))'
+  ], {
+    cwd: path.resolve(__dirname, '../..'),
+    timeout: 3000,
+    stdio: 'ignore',
+  });
+  dbAvailable = true;
+} catch {
+  dbAvailable = false;
+}
 
 beforeAll(async () => {
-  try {
+  if (dbAvailable) {
     await prisma.$connect();
-    dbAvailable = true;
-  } catch {
+  } else {
     console.warn(
       '\n⚠️  ─────────────────────────────────────────────────────\n' +
       '   INTEGRATION TESTS SKIPPED — PostgreSQL is unavailable.\n' +
@@ -38,7 +53,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.$disconnect();
+  if (dbAvailable) {
+    await prisma.$disconnect();
+  }
 });
 
 /**

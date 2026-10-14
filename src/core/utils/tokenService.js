@@ -102,10 +102,45 @@ function buildRefreshTokenExpiry() {
   return new Date(Date.now() + parseDurationMs(jwtConfig.refreshExpiresIn));
 }
 
+/**
+ * Sign an admin access JWT.
+ *
+ * Payload contains { sub, email, role }.
+ *
+ * @param {{ sub: string, email: string, role: string }} payload
+ * @returns {string} signed JWT
+ */
+function generateAdminAccessToken({ sub, email, role }) {
+  return jwt.sign(
+    { sub, email, role },
+    jwtConfig.accessSecret,
+    { expiresIn: jwtConfig.accessExpiresIn }
+  );
+}
+
+/**
+ * Sign a business (dealer/distributor) access JWT.
+ *
+ * Payload contains { sub, email, role, org_id }.
+ *
+ * @param {{ sub: string, email: string, role: string, org_id: string }} payload
+ * @returns {string} signed JWT
+ */
+function generateBusinessAccessToken({ sub, email, role, org_id }) {
+  return jwt.sign(
+    { sub, email, role, org_id },
+    jwtConfig.accessSecret,
+    { expiresIn: jwtConfig.accessExpiresIn }
+  );
+}
+
 module.exports = {
   generateAccessToken,
+  generateAdminAccessToken,
+  generateBusinessAccessToken,
   verifyAccessToken,
   generateRawRefreshToken,
   hashRefreshToken,
   buildRefreshTokenExpiry,
 };
+
