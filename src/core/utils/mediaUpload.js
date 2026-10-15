@@ -93,6 +93,13 @@ async function uploadFileToStorage({ file, folder = 'uploads' }) {
     };
   }
 
+  // Phase Seven Guard: In production, never silently fall back to local disk
+  if (process.env.NODE_ENV === 'production') {
+    throw ApiError.internal(
+      'Cloud storage service is not configured or unavailable in production. Local storage fallback is disabled.'
+    );
+  }
+
   // Safe local development fallback:
   // Write to local uploads directory and return local URL path
   const localDir = path.resolve(process.cwd(), 'uploads', folder);

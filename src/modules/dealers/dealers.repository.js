@@ -55,6 +55,30 @@ const dealersRepository = {
   },
 
   /**
+   * findAllActive
+   * Find active dealers filtered by optional type and text search query.
+   */
+  async findAllActive({ type, query: searchQuery } = {}) {
+    const where = { is_active: true };
+    if (type) {
+      const normalizedType = type === 'DISTRIBUTOR_HUB' ? 'DISTRIBUTOR' : type;
+      where.type = normalizedType;
+    }
+    if (searchQuery) {
+      where.OR = [
+        { name: { contains: searchQuery, mode: 'insensitive' } },
+        { city: { contains: searchQuery, mode: 'insensitive' } },
+        { country: { contains: searchQuery, mode: 'insensitive' } },
+        { address: { contains: searchQuery, mode: 'insensitive' } },
+      ];
+    }
+    return prisma.dealer.findMany({
+      where,
+      orderBy: { name: 'asc' },
+    });
+  },
+
+  /**
    * findCsrContact
    * Find active CSR contacts for a specific country
    */

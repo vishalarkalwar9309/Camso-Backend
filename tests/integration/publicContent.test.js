@@ -199,6 +199,138 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
       expect(res.status).toBe(404);
       expect(res.body.error.type).toBe('NOT_FOUND');
     });
+
+    test('GET /api/v1/documents/:id/download returns download payload and increments count', async () => {
+      const mockDoc = {
+        id: 'cuid_document_0000000001',
+        document_type: 'MANUAL',
+        download_count: 5,
+        files: [
+          { language_code: 'en', media_asset: { id: 'm1', url: 'https://storage.googleapis.com/test/doc.pdf', file_name: 'doc.pdf', mime_type: 'application/pdf', file_size_bytes: 1024 } },
+        ],
+      };
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(mockDoc);
+      documentsRepository.incrementDownloadCount.mockResolvedValue({ ...mockDoc, download_count: 6 });
+
+      const res = await request(app).get('/api/v1/documents/cuid_document_0000000001/download?lang=en');
+      expect(res.status).toBe(200);
+      expect(res.body.data.download_url).toBe('https://storage.googleapis.com/test/doc.pdf');
+      expect(res.body.data.download_count).toBe(6);
+      expect(documentsRepository.incrementDownloadCount).toHaveBeenCalledWith('cuid_document_0000000001');
+    });
+
+    test('GET /api/v1/documents/:id/download returns 404 for missing document', async () => {
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(null);
+
+      const res = await request(app).get('/api/v1/documents/cuid_document_0000000099/download');
+      expect(res.status).toBe(404);
+      expect(res.body.error.type).toBe('NOT_FOUND');
+    });
+
+    test('GET /api/v1/documents/:id/download rejects unauthenticated user for restricted technical guide with 401', async () => {
+      const mockRestrictedDoc = {
+        id: 'cuid_doc_tech_01',
+        document_type: 'TECHNICAL_GUIDE',
+        files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf' } }],
+      };
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(mockRestrictedDoc);
+
+      const res = await request(app).get('/api/v1/documents/cuid_doc_tech_01/download');
+      expect(res.status).toBe(401);
+      expect(res.body.error.message).toMatch(/Authentication required/);
+    });
+
+    test('GET /api/v1/documents/:id/download rejects guest user for restricted document with 403', async () => {
+      const mockRestrictedDoc = {
+        id: 'cuid_doc_tech_01',
+        document_type: 'TECHNICAL_GUIDE',
+        files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf' } }],
+      };
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(mockRestrictedDoc);
+
+      const { generateAccessToken } = require('../../src/core/utils/tokenService');
+      const guestToken = generateAccessToken({ sub: 'guest_123', is_guest: true, role: 'GUEST' });
+
+      const res = await request(app)
+        .get('/api/v1/documents/cuid_doc_tech_01/download')
+        .set('Authorization', `Bearer ${guestToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.message).toMatch(/Guest users are not authorized/);
+    });
+
+    test('GET /api/v1/documents/:id/download rejects customer for technical guide with 403', async () => {
+      const mockRestrictedDoc = {
+        id: 'cuid_doc_tech_01',
+        document_type: 'TECHNICAL_GUIDE',
+        files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf' } }],
+      };
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(mockRestrictedDoc);
+
+      const { generateAccessToken } = require('../../src/core/utils/tokenService');
+      const customerToken = generateAccessToken({ sub: 'cust_123', is_guest: false, role: 'END_USER' });
+
+      const res = await request(app)
+        .get('/api/v1/documents/cuid_doc_tech_01/download')
+        .set('Authorization', `Bearer ${customerToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.message).toMatch(/not authorized to download technical documentation/);
+    });
+
+    test('GET /api/v1/documents/:id/download allows authorized dealer for technical guide with 200', async () => {
+      const mockRestrictedDoc = {
+        id: 'cuid_doc_tech_01',
+        document_type: 'TECHNICAL_GUIDE',
+        download_count: 10,
+        files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf', file_name: 'tech.pdf' } }],
+      };
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(mockRestrictedDoc);
+      documentsRepository.incrementDownloadCount.mockResolvedValue({ ...mockRestrictedDoc, download_count: 11 });
+
+      const { generateBusinessAccessToken } = require('../../src/core/utils/tokenService');
+      const dealerToken = generateBusinessAccessToken({ sub: 'dealer_123', email: 'dealer@test.com', role: 'DEALER', org_id: 'org_1' });
+
+      const res = await request(app)
+        .get('/api/v1/documents/cuid_doc_tech_01/download')
+        .set('Authorization', `Bearer ${dealerToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.download_url).toBe('https://storage.googleapis.com/test/tech.pdf');
+    });
+
+    test('GET /api/v1/documents/:id/download rejects cross-organization access with 403', async () => {
+      const mockRestrictedDoc = {
+        id: 'cuid_doc_tech_01',
+        document_type: 'TECHNICAL_GUIDE',
+        organization_id: 'org_assigned_to_doc',
+        files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf' } }],
+      };
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(mockRestrictedDoc);
+
+      const { generateBusinessAccessToken } = require('../../src/core/utils/tokenService');
+      const otherOrgToken = generateBusinessAccessToken({ sub: 'dealer_123', email: 'dealer@test.com', role: 'DEALER', org_id: 'different_org' });
+
+      const res = await request(app)
+        .get('/api/v1/documents/cuid_doc_tech_01/download')
+        .set('Authorization', `Bearer ${otherOrgToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.message).toMatch(/Cross-organization document access is prohibited/);
+    });
+
+    test('GET /api/v1/documents/:id/download returns 404 when document has no file attached', async () => {
+      const mockEmptyDoc = {
+        id: 'cuid_doc_pub_empty',
+        document_type: 'CATALOGUE',
+        files: [],
+      };
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(mockEmptyDoc);
+
+      const res = await request(app).get('/api/v1/documents/cuid_doc_pub_empty/download');
+      expect(res.status).toBe(404);
+      expect(res.body.error.message).toMatch(/No downloadable file attached/);
+    });
   });
 
   // ─── TESTIMONIALS ──────────────────────────────────────────────────────────

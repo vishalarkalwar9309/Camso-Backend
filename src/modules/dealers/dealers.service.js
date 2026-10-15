@@ -34,17 +34,25 @@ const dealersService = {
    * getLocator
    * Retrieves active dealers within a given radius using Haversine calculation.
    */
-  async getLocator({ lat, lng, type, radiusKm }) {
-    // Validate inputs numerically at service boundary just in case
-    const nLat = parseFloat(lat);
-    const nLng = parseFloat(lng);
-    const nRad = parseFloat(radiusKm);
+  async getLocator({ lat, lng, type, radiusKm, query, q }) {
+    const searchQuery = query || q;
+    if (lat !== undefined && lng !== undefined && lat !== null && lng !== null && String(lat).trim() !== '' && String(lng).trim() !== '') {
+      const nLat = parseFloat(lat);
+      const nLng = parseFloat(lng);
+      const nRad = parseFloat(radiusKm || 1000);
+      const normalizedType = type === 'DISTRIBUTOR_HUB' ? 'DISTRIBUTOR' : type;
 
-    return dealersRepository.findNearest({
-      lat: nLat,
-      lng: nLng,
+      return dealersRepository.findNearest({
+        lat: nLat,
+        lng: nLng,
+        type: normalizedType,
+        radiusKm: nRad,
+      });
+    }
+
+    return dealersRepository.findAllActive({
       type,
-      radiusKm: nRad
+      query: searchQuery,
     });
   },
 

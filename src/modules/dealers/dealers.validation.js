@@ -29,10 +29,12 @@
 const Joi = require('joi');
 
 const locatorSchema = Joi.object({
-  lat: Joi.number().min(-90).max(90).required(),
-  lng: Joi.number().min(-180).max(180).required(),
-  type: Joi.string().valid('DEALER', 'DISTRIBUTOR').optional(),
-  radiusKm: Joi.number().positive().max(50000).required() // reasonable upper bound
+  lat: Joi.number().min(-90).max(90).optional(),
+  lng: Joi.number().min(-180).max(180).optional(),
+  type: Joi.string().valid('DEALER', 'DISTRIBUTOR', 'DISTRIBUTOR_HUB').optional(),
+  radiusKm: Joi.number().positive().max(50000).optional().default(1000),
+  query: Joi.string().trim().max(100).optional(),
+  q: Joi.string().trim().max(100).optional(),
 });
 
 const csrContactSchema = Joi.object({

@@ -25,11 +25,12 @@ async function deleteTranslations(entityType, entityId, prismaClient) {
   return translationRepository.deleteByEntity(entityType, entityId, prismaClient);
 }
 
-function attachTranslations(entity, translations, language = 'en') {
-  const forLanguage = translations.filter((t) => t.language_code === language);
+function attachTranslations(entity, translations = [], language = 'en') {
+  const safeTranslations = Array.isArray(translations) ? translations : [];
+  const forLanguage = safeTranslations.filter((t) => t.language_code === language);
   const source = forLanguage.length > 0
     ? forLanguage
-    : translations.filter((t) => t.language_code === 'en');
+    : safeTranslations.filter((t) => t.language_code === 'en');
 
   const translated = source.reduce((acc, t) => {
     acc[t.field] = t.value;
@@ -39,14 +40,15 @@ function attachTranslations(entity, translations, language = 'en') {
   return { ...entity, ...translated };
 }
 
-function attachManyTranslations(entities, allTranslations, language = 'en') {
-  const translationsByEntity = allTranslations.reduce((acc, t) => {
+function attachManyTranslations(entities = [], allTranslations = [], language = 'en') {
+  const safeTranslations = Array.isArray(allTranslations) ? allTranslations : [];
+  const translationsByEntity = safeTranslations.reduce((acc, t) => {
     if (!acc[t.entity_id]) acc[t.entity_id] = [];
     acc[t.entity_id].push(t);
     return acc;
   }, {});
 
-  return entities.map((entity) => {
+  return (entities || []).map((entity) => {
     const entityTranslations = translationsByEntity[entity.id] || [];
     return attachTranslations(entity, entityTranslations, language);
   });

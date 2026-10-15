@@ -1,18 +1,25 @@
-FROM node:24-alpine
+# Node.js 20 LTS Alpine image for minimal size and security
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Install dependencies first (layer cache)
+# Install openssl for Prisma binary compatibility
+RUN apk add --no-cache openssl libc6-compat
+
+# Install dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Copy Prisma schema and generate client
 COPY prisma ./prisma/
-RUN npx prisma generate
 
-# Copy source
-COPY src ./src/
+RUN npm ci --omit=dev && npx prisma generate
 
+# Copy source code
+COPY src ./src
+
+# Expose port (Cloud Run / Render dynamically injects PORT)
 EXPOSE 4000
 
+ENV NODE_ENV=production
+ENV PORT=4000
+
+# Start production server
 CMD ["node", "src/server.js"]

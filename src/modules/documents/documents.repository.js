@@ -227,6 +227,17 @@ const documentsRepository = {
       },
     });
   },
+
+  async incrementDownloadCount(id, prismaClient = prisma) {
+    return prismaClient.document.update({
+      where: { id },
+      data: {
+        download_count: {
+          increment: 1,
+        },
+      },
+    });
+  },
 };
 
 module.exports = documentsRepository;

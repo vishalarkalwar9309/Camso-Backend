@@ -83,4 +83,18 @@ describe('Media Upload Utility (src/core/utils/mediaUpload.js)', () => {
     expect(ALLOWED_MIME_TYPES).toContain('application/pdf');
     expect(ALLOWED_MIME_TYPES).toContain('video/mp4');
   });
+
+  it('throws in production mode if Firebase Storage is not configured (no silent fallback)', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    jest.spyOn(firebaseConfig, 'getIsFirebaseReady').mockReturnValue(false);
+
+    try {
+      await expect(
+        uploadFileToStorage({ file: dummyFile, folder: 'test_folder' })
+      ).rejects.toThrow(/Cloud storage service is not configured or unavailable in production/);
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
 });

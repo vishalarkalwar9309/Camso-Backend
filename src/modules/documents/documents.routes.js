@@ -84,5 +84,6 @@ router.get('/', asyncHandler(documentsController.list));
  *         description: Document not found or draft
  */
 router.get('/:id', asyncHandler(documentsController.getById));
+router.get('/:id/download', asyncHandler(documentsController.download));
 
 module.exports = router;

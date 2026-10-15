@@ -107,12 +107,18 @@ function validateDemoCredentials(env = process.env) {
     );
   }
 
-  return {
+  const creds = {
     customerPass: endUserPass,
     adminPass: env.DEMO_ADMIN_PASSWORD,
     dealerPass: env.DEMO_DEALER_PASSWORD,
     distribPass: env.DEMO_DISTRIBUTOR_PASSWORD,
   };
+
+  if (env.DEMO_OEM_PASSWORD && env.DEMO_OEM_PASSWORD.trim() !== '') {
+    creds.oemPass = env.DEMO_OEM_PASSWORD.trim();
+  }
+
+  return creds;
 }
 
 /**
@@ -287,6 +293,61 @@ async function seedDemoAccounts(prisma, credentials) {
     results.existed.push(`Distributor Org (${distribCode}) + Staff (${distribEmail})`);
   } else {
     throw new Error(`[CONFLICT] Partial distributor entity exists: Org=${Boolean(existingDistribOrg)}, User=${Boolean(existingDistribUser)}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5. OEM Partner Organization & Staff Persona
+  // ---------------------------------------------------------------------------
+  if (credentials.oemPass) {
+    const oemCode = 'ORG-OEM-DEMO';
+    const oemEmail = 'demo.oem@camso.local';
+
+    const existingOemOrg = await prisma.businessOrganization.findUnique({
+      where: { code: oemCode },
+      select: { id: true, name: true, type: true, approval_status: true },
+    });
+    const existingOemUser = await prisma.businessUser.findUnique({
+      where: { email: oemEmail },
+      select: { id: true, organization_id: true, role: true, status: true, display_name: true },
+    });
+
+    if (!existingOemOrg && !existingOemUser) {
+      const passwordHash = await hashPassword(credentials.oemPass);
+      await prisma.$transaction(async (tx) => {
+        const org = await tx.businessOrganization.create({
+          data: {
+            name: 'Demo OEM Partner Enterprise',
+            code: oemCode,
+            type: 'OEM_PARTNER',
+            approval_status: 'APPROVED',
+            is_active: true,
+            email: oemEmail,
+          },
+        });
+        await tx.businessUser.create({
+          data: {
+            organization_id: org.id,
+            email: oemEmail,
+            password_hash: passwordHash,
+            display_name: 'Demo OEM Partner User',
+            role: 'OEM_PARTNER',
+            status: 'ACTIVE',
+          },
+        });
+      });
+      results.created.push(`OEM Partner Org (${oemCode}) + Staff (${oemEmail})`);
+    } else if (existingOemOrg && existingOemUser) {
+      if (
+        existingOemOrg.type !== 'OEM_PARTNER' ||
+        existingOemUser.role !== 'OEM_PARTNER' ||
+        existingOemUser.organization_id !== existingOemOrg.id
+      ) {
+        throw new Error(`[CONFLICT] OEM Partner org (${oemCode}) or user (${oemEmail}) exists with conflicting linkage.`);
+      }
+      results.existed.push(`OEM Partner Org (${oemCode}) + Staff (${oemEmail})`);
+    } else {
+      throw new Error(`[CONFLICT] Partial OEM Partner entity exists: Org=${Boolean(existingOemOrg)}, User=${Boolean(existingOemUser)}`);
+    }
   }
 
   return results;

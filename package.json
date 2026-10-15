@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
+    "build": "prisma generate",
     "dev": "nodemon src/server.js",
     "test": "jest --forceExit",
     "test:unit": "jest tests/unit --forceExit",

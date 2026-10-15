@@ -105,6 +105,25 @@ describe('prisma/seed.demo.js unit tests', () => {
         distribPass: 'DistribPass123!',
       });
     });
+
+    it('attaches oemPass when DEMO_OEM_PASSWORD is provided', () => {
+      const envWithOem = {
+        DEMO_CUSTOMER_PASSWORD: 'CustomerPass123!',
+        DEMO_ADMIN_PASSWORD: 'AdminPass123!',
+        DEMO_DEALER_PASSWORD: 'DealerPass123!',
+        DEMO_DISTRIBUTOR_PASSWORD: 'DistribPass123!',
+        DEMO_OEM_PASSWORD: 'OemPass123!',
+      };
+
+      const result = validateDemoCredentials(envWithOem);
+      expect(result).toEqual({
+        customerPass: 'CustomerPass123!',
+        adminPass: 'AdminPass123!',
+        dealerPass: 'DealerPass123!',
+        distribPass: 'DistribPass123!',
+        oemPass: 'OemPass123!',
+      });
+    });
   });
 
   describe('Seeder Logic & Idempotency (seedDemoAccounts)', () => {
@@ -153,6 +172,20 @@ describe('prisma/seed.demo.js unit tests', () => {
       expect(mockPrisma.user.create).toHaveBeenCalledTimes(1);
       expect(mockPrisma.adminUser.create).toHaveBeenCalledTimes(1);
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2); // dealer + distributor
+    });
+
+    it('creates all 5 entities including OEM Partner when oemPass is supplied', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.adminUser.findUnique.mockResolvedValue(null);
+      mockPrisma.businessOrganization.findUnique.mockResolvedValue(null);
+      mockPrisma.businessUser.findUnique.mockResolvedValue(null);
+
+      const credsWithOem = { ...testCredentials, oemPass: 'OemPass123' };
+      const result = await seedDemoAccounts(mockPrisma, credsWithOem);
+
+      expect(result.created).toHaveLength(5);
+      expect(result.existed).toHaveLength(0);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(3); // dealer + distributor + oem
     });
 
     it('skips all 4 entities when all already exist with matching demo identity (idempotent)', async () => {

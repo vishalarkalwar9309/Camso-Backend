@@ -123,4 +123,26 @@ describe('FCM Notification Service (src/core/services/fcmService.js)', () => {
       data: { is_active: false },
     });
   });
+
+  it('refuses simulated success in production mode when Firebase is not configured', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    jest.spyOn(firebaseConfig, 'getIsFirebaseReady').mockReturnValue(false);
+
+    try {
+      const res = await sendMulticastNotification({
+        tokens: ['tok_1', 'tok_2'],
+        title: 'Production Test',
+        body: 'Testing production guard',
+      });
+
+      expect(res.is_mock).toBe(false);
+      expect(res.totalTokens).toBe(2);
+      expect(res.successCount).toBe(0);
+      expect(res.failureCount).toBe(2);
+      expect(res.error).toMatch(/Firebase Cloud Messaging is not configured or unavailable in production/);
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
 });

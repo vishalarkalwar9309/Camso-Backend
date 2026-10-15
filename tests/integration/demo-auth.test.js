@@ -118,7 +118,7 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
 
     it('can list admin users via GET /api/v1/admin/admin-users', async () => {
       const res = await request(app)
-        .get('/api/v1/admin/admin-users')
+        .get('/api/v1/admin/admin-users?pageSize=100')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
@@ -129,7 +129,7 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
 
     it('can inspect business organizations via GET /api/v1/admin/organizations', async () => {
       const res = await request(app)
-        .get('/api/v1/admin/organizations')
+        .get('/api/v1/admin/organizations?pageSize=100')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);

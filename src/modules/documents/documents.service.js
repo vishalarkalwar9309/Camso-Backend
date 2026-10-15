@@ -27,7 +27,7 @@
 
 const documentsRepository = require('./documents.repository');
 const { parsePagination, buildPaginationMeta } = require('../../core/utils/pagination');
-const { getTranslations, attachTranslations } = require('../../core/utils/translate');
+const { getTranslations, getManyTranslations, attachTranslations, attachManyTranslations } = require('../../core/utils/translate');
 const ApiError = require('../../core/utils/ApiError');
 
 const documentsService = {
@@ -54,14 +54,15 @@ const documentsService = {
     const paginationOptions = parsePagination(query);
     const [total, records] = await documentsRepository.findPublishedDocuments(filters, paginationOptions);
 
-    const documents = await Promise.all(
-      records.map(async (doc) => {
-        const translations = await getTranslations('DOCUMENT', doc.id);
-        return attachTranslations(doc, translations, query.lang || 'en');
-      }),
-    );
-
     const meta = buildPaginationMeta(paginationOptions.page, paginationOptions.pageSize, total);
+
+    if (!records || records.length === 0) {
+      return { documents: [], pagination: meta };
+    }
+
+    const docIds = records.map((doc) => doc.id);
+    const translations = await getManyTranslations('DOCUMENT', docIds);
+    const documents = attachManyTranslations(records, translations, query.lang || 'en');
 
     return { documents, pagination: meta };
   },
@@ -108,14 +109,16 @@ const documentsService = {
     const paginationOptions = parsePagination(query);
     const [total, records] = await documentsRepository.findAdminDocuments(filters, paginationOptions);
 
-    const documents = await Promise.all(
-      records.map(async (doc) => {
-        const translations = await getTranslations('DOCUMENT', doc.id);
-        return attachTranslations(doc, translations, query.lang || 'en');
-      }),
-    );
-
     const meta = buildPaginationMeta(paginationOptions.page, paginationOptions.pageSize, total);
+
+    if (!records || records.length === 0) {
+      return { documents: [], pagination: meta };
+    }
+
+    const docIds = records.map((doc) => doc.id);
+    const translations = await getManyTranslations('DOCUMENT', docIds);
+    const documents = attachManyTranslations(records, translations, query.lang || 'en');
+
     return { documents, pagination: meta };
   },
 
@@ -204,8 +207,24 @@ const documentsService = {
     const existing = await documentsRepository.findAdminDocumentById(id);
     if (!existing) throw ApiError.notFound('Document not found.');
 
-    const { uploadToFirebase } = require('../../core/utils/mediaUpload');
-    const mediaAsset = await uploadToFirebase(file, adminUserId, undefined, 'documents');
+    const supabaseConfig = require('../../config/supabase');
+    let mediaAsset;
+
+    if (supabaseConfig.isSupabaseReady) {
+      const { uploadFileToSupabase } = require('../../core/utils/supabaseStorage');
+      const mediaAssetRepository = require('../../core/repositories/mediaAsset.repository');
+      const storageResult = await uploadFileToSupabase({ file, folder: 'documents' });
+      mediaAsset = await mediaAssetRepository.createMediaAsset({
+        url: storageResult.url,
+        filename: file.originalname || storageResult.filename,
+        mime_type: file.mimetype || 'application/pdf',
+        size_bytes: file.size,
+        uploaded_by_admin_id: adminUserId ? String(adminUserId) : null,
+      });
+    } else {
+      const { uploadToFirebase } = require('../../core/utils/mediaUpload');
+      mediaAsset = await uploadToFirebase(file, adminUserId, undefined, 'documents');
+    }
 
     const docFile = await documentsRepository.addDocumentFile(id, languageCode, mediaAsset.id);
 
@@ -218,6 +237,111 @@ const documentsService = {
     });
 
     return docFile;
+  },
+
+  async downloadDocument(id, lang = 'en', actor = null, req = null) {
+    const doc = await documentsRepository.findPublishedDocumentById(id);
+    if (!doc) {
+      throw ApiError.notFound('Document not found or unpublished.');
+    }
+
+    // Determine access level:
+    // Explicit access_level on doc if defined, otherwise derive from document_type:
+    // CATALOGUE, BROCHURE, WARRANTY, MANUAL are PUBLIC.
+    // TECHNICAL_GUIDE, BULLETIN are RESTRICTED.
+    const explicitLevel = doc.access_level ? String(doc.access_level).toUpperCase() : null;
+    const isPublic = explicitLevel ? explicitLevel === 'PUBLIC' : ['CATALOGUE', 'BROCHURE', 'WARRANTY', 'MANUAL'].includes(doc.document_type);
+
+    if (!isPublic) {
+      // 1. Must be authenticated
+      if (!actor || !actor.id) {
+        throw ApiError.unauthorized('Authentication required to download this document.');
+      }
+      // 2. Guests cannot download restricted technical files
+      if (actor.is_guest) {
+        throw ApiError.forbidden('Guest users are not authorized to download restricted technical documentation.');
+      }
+
+      const role = actor.role || 'END_USER';
+      const isSuperOrContentAdmin = ['SUPER_ADMIN', 'CONTENT_ADMIN'].includes(role);
+
+      if (!isSuperOrContentAdmin) {
+        // Enforce role-based access
+        if (explicitLevel) {
+          if (explicitLevel === 'DEALER' && role !== 'DEALER') {
+            throw ApiError.forbidden('This document is restricted to authorized Dealers.');
+          }
+          if (explicitLevel === 'DISTRIBUTOR' && role !== 'DISTRIBUTOR') {
+            throw ApiError.forbidden('This document is restricted to regional Distributors.');
+          }
+          if ((explicitLevel === 'OEM' || explicitLevel === 'OEM_PARTNER') && role !== 'OEM_PARTNER') {
+            throw ApiError.forbidden('This document is restricted to OEM Integration Partners.');
+          }
+          if (explicitLevel === 'ADMIN') {
+            throw ApiError.forbidden('This document is restricted to platform Administrators.');
+          }
+        } else {
+          // If no explicit access_level, TECHNICAL_GUIDE and BULLETIN require business or admin role
+          if (['TECHNICAL_GUIDE', 'BULLETIN'].includes(doc.document_type)) {
+            const allowedRoles = ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'];
+            if (!allowedRoles.includes(role)) {
+              throw ApiError.forbidden('Your account role is not authorized to download technical documentation.');
+            }
+          }
+        }
+
+        // Enforce organization scoping if document is tied to a specific organization
+        if (doc.organization_id && actor.org_id && doc.organization_id !== actor.org_id) {
+          throw ApiError.forbidden('Cross-organization document access is prohibited.');
+        }
+      }
+    }
+
+    const files = doc.files || [];
+    const targetFile = files.find((f) => f.language_code === lang) || files[0];
+    const media = targetFile?.media_asset;
+
+    if (!media || !media.url) {
+      throw ApiError.notFound('No downloadable file attached to this document.');
+    }
+
+    // Increment download count only when authorized file actually exists
+    await documentsRepository.incrementDownloadCount(id);
+
+    // Record user activity
+    const actorId = actor?.id || req?.headers?.['x-device-id'] || null;
+    if (actorId) {
+      try {
+        const { prisma } = require('../../config/database');
+        await prisma.userActivity.create({
+          data: {
+            user_id: actor?.is_guest ? null : (actor?.id || null),
+            device_id: typeof actorId === 'string' && !actor?.id ? actorId : null,
+            activity_type: 'DOCUMENT_DOWNLOAD',
+            entity_type: 'DOCUMENT',
+            entity_id: id,
+            metadata: { document_type: doc.document_type, lang, access_level: isPublic ? 'PUBLIC' : (explicitLevel || 'RESTRICTED') },
+          },
+        });
+      } catch (_) {
+        // Non-blocking activity recording
+      }
+    }
+
+    let downloadUrl = media.url;
+    if (media.url && (media.url.startsWith('supabase://') || media.url.startsWith('documents/'))) {
+      const { createSignedDownloadUrl } = require('../../core/utils/supabaseStorage');
+      downloadUrl = await createSignedDownloadUrl(media.url, 3600);
+    }
+
+    return {
+      document_id: doc.id,
+      download_url: downloadUrl,
+      file_name: media.filename || media.file_name || `camso-document-${doc.id}.pdf`,
+      mime_type: media.mime_type || 'application/pdf',
+      file_size_bytes: media.size_bytes || media.file_size_bytes || null,
+      download_count: (doc.download_count || 0) + 1,
+    };
   },
 };
 

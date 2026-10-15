@@ -14,8 +14,10 @@ logs/
 dist/
 coverage/
 
-# Local uploads (file storage goes through Firebase Storage in production)
+# Local uploads and backups
 uploads/
+backups/
+*.sql
 
 # OS
 .DS_Store

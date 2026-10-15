@@ -38,8 +38,13 @@ app.use(helmet());
 // In production: restrict to specific origins (configure via env when deployment is set up).
 // ASSUMPTION: CORS origin policy for production will be confirmed with CEAT.
 // Marked as pending — currently permissive for development.
+const rawOrigins = process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN;
 const corsOptions = env.isProduction
-  ? { origin: process.env.ALLOWED_ORIGINS?.split(',') || false }
+  ? {
+      origin: (!rawOrigins || rawOrigins === '*')
+        ? '*'
+        : rawOrigins.split(',').map((o) => o.trim()).filter(Boolean),
+    }
   : { origin: '*' };
 app.use(cors(corsOptions));
 

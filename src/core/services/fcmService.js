@@ -70,6 +70,17 @@ async function sendMulticastNotification({
 
   // 2. Check if Firebase messaging is available
   if (!firebase.getIsFirebaseReady()) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[FCM] Firebase not configured in production mode. Cannot dispatch to ${totalTokens} target token(s).`);
+      return {
+        totalTokens,
+        successCount: 0,
+        failureCount: totalTokens,
+        invalidTokens: [],
+        is_mock: false,
+        error: 'Firebase Cloud Messaging is not configured or unavailable in production.',
+      };
+    }
     console.warn(`[FCM] Firebase not configured. Simulated dispatch to ${totalTokens} target token(s).`);
     return {
       totalTokens,

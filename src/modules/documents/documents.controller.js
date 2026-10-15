@@ -79,6 +79,43 @@ const documentsController = {
 
     return ApiResponse.success(res, document);
   },
+
+  /**
+   * download
+   *
+   * USE: Express handler for GET /api/v1/documents/:id/download.
+   */
+  async download(req, res) {
+    const { id, lang } = validateDetailParams(req.params, req.query);
+    let actor = req.user || req.businessUser || req.adminUser || null;
+
+    if (!actor && req.headers && req.headers.authorization) {
+      const authHeader = req.headers.authorization;
+      if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7).trim();
+        try {
+          const { verifyAccessToken } = require('../../core/utils/tokenService');
+          const decoded = verifyAccessToken(token);
+          if (decoded) {
+            actor = {
+              id: decoded.sub || decoded.id,
+              email: decoded.email || null,
+              role: decoded.role || (decoded.is_guest ? 'GUEST' : 'END_USER'),
+              is_guest: Boolean(decoded.is_guest),
+              org_id: decoded.org_id || null,
+            };
+          }
+        } catch (_) {
+          // Token invalid or expired
+        }
+      }
+    }
+
+    const downloadData = await documentsService.downloadDocument(id, lang, actor, req);
+
+    return ApiResponse.success(res, downloadData);
+  },
+
   async adminList(req, res) {
     const validatedQuery = require('./documents.validation').validateListQuery(req.query);
     const { product_id, category_id, document_type, lang } = validatedQuery;

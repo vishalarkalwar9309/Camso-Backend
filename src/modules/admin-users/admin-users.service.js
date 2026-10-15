@@ -210,7 +210,8 @@ async function listOrganizations({ type, approval_status, page = 1, pageSize = 2
   };
 }
 
-async function updateOrganizationApproval(actor, id, { approval_status }) {
+async function updateOrganizationApproval(actor, id, body = {}) {
+  const approval_status = body.approval_status || body.status;
   if (!approval_status || !VALID_APPROVAL_STATUSES.includes(approval_status)) {
     throw ApiError.badRequest(`Invalid approval status. Allowed: ${VALID_APPROVAL_STATUSES.join(', ')}`);
   }
