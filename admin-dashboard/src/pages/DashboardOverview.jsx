@@ -52,89 +52,124 @@ export default function DashboardOverview() {
   const [contentMetrics, setContentMetrics] = useState(null);
   const [catalogueMetrics, setCatalogueMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [errorNotice, setErrorNotice] = useState(null);
 
-  const fetchMetrics = async () => {
-    setLoading(true);
+  const fetchMetrics = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
+    setErrorNotice(null);
     try {
-      // 1. Fetch our Content Analytics (TASK-07 endpoint)
-      try {
-        const cRes = await api.get('/admin/analytics/content');
-        setContentMetrics(cRes.data);
-      } catch (e) {
-        // Fallback realistic metrics for local preview if server offline
-        setContentMetrics({
-          total_downloads: 1480,
-          top_documents: [
-            { id: 'doc_1', title: 'Industrial Solid Tires Catalogue 2026', document_type: 'CATALOGUE', download_count: 840, is_published: true },
-            { id: 'doc_2', title: 'Construction Tracks Technical Fitting Guide', document_type: 'TECHNICAL_GUIDE', download_count: 420, is_published: true },
-            { id: 'doc_3', title: 'Material Handling Equipment Operating Manual', document_type: 'MANUAL', download_count: 220, is_published: true },
-          ],
-          feedback_summary: {
-            total_feedback: 64,
-            avg_rating: 4.4,
-            rating_breakdown: { '1': 2, '2': 3, '3': 6, '4': 21, '5': 32 },
-            bucket_counts: { PRODUCT: 38, SERVICE: 18, PRICING: 8 },
-          },
-        });
+      const [cRes, catRes] = await Promise.allSettled([
+        api.get('/admin/analytics/content'),
+        api.get('/admin/analytics/catalogue'),
+      ]);
+
+      if (cRes.status === 'fulfilled' && cRes.value?.data) {
+        setContentMetrics(cRes.value.data);
+      } else if (cRes.status === 'rejected') {
+        console.warn('Failed to load content metrics:', cRes.reason);
       }
 
-      // 2. Fetch Catalogue Analytics (Vishal's endpoint)
-      try {
-        const catRes = await api.get('/admin/analytics/catalogue');
-        setCatalogueMetrics(catRes.data);
-      } catch (e) {
-        setCatalogueMetrics({
-          top_searches: [
-            { query_text: 'solid tire 18x7-8', hit_count: 312 },
-            { query_text: 'rubber tracks skid steer', hit_count: 245 },
-            { query_text: 'forklift traction', hit_count: 189 },
-          ],
-          top_bookmarked_products: [
-            { product_id: 'prod_1', bookmark_count: 94 },
-            { product_id: 'prod_2', bookmark_count: 76 },
-          ],
-        });
+      if (catRes.status === 'fulfilled' && catRes.value?.data) {
+        setCatalogueMetrics(catRes.value.data);
+      } else if (catRes.status === 'rejected') {
+        console.warn('Failed to load catalogue metrics:', catRes.reason);
       }
+
+      if (cRes.status === 'rejected' && catRes.status === 'rejected') {
+        setErrorNotice('Unable to reach analytics endpoints. Metrics display last recorded data.');
+      }
+
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (err) {
+      setErrorNotice(err.message || 'Error refreshing metrics');
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMetrics();
+    fetchMetrics(false);
   }, []);
 
+  // 30-second periodic refresh
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      fetchMetrics(true);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
+
   const totalDownloads = contentMetrics?.total_downloads || 0;
-  const avgRating = contentMetrics?.feedback_summary?.avg_rating || 0;
+  const avgRating = Number(contentMetrics?.feedback_summary?.avg_rating || 0).toFixed(1);
   const totalFeedback = contentMetrics?.feedback_summary?.total_feedback || 0;
   const ratingBreakdown = contentMetrics?.feedback_summary?.rating_breakdown || { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+
+  const totalSearches = (catalogueMetrics?.top_searches || []).reduce(
+    (acc, curr) => acc + (curr.hit_count || curr.count || 0),
+    0
+  );
+
+  const bookmarkList = catalogueMetrics?.most_bookmarked_products || catalogueMetrics?.top_bookmarked_products || [];
+  const totalBookmarks = bookmarkList.reduce(
+    (acc, curr) => acc + (curr.bookmark_count || curr.count || 0),
+    0
+  );
 
   return (
     <div className="space-y-8">
       {/* Overview Toolbar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl font-bold text-slate-900">Dashboard & Analytics Overview</h2>
-            <span className="text-[10px] font-bold bg-[#FFCC00] text-slate-950 px-2 py-0.5 rounded uppercase tracking-wider">
-              Live
+            <span className="text-[10px] font-bold bg-[#0055b8] text-white px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-emerald-400 animate-pulse' : 'bg-slate-300'}`}></span>
+              {autoRefresh ? 'Periodic Refresh: 30s' : 'Refresh Paused'}
             </span>
+            {lastUpdated && (
+              <span className="text-[11px] text-slate-400 font-mono">
+                Updated {lastUpdated}
+              </span>
+            )}
           </div>
           <p className="text-sm text-slate-500 font-normal mt-0.5">
-            Operational intelligence across technical documents, search queries, and Voice of Customer
+            Operational metrics computed from production database (periodic 30s polling)
           </p>
         </div>
-        <button
-          onClick={fetchMetrics}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-xs font-bold shadow-sm shadow-blue-900/20 transition disabled:opacity-50"
-        >
-          <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh Metrics
-        </button>
+
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="rounded text-[#0055b8] focus:ring-[#0055b8]"
+            />
+            <span>Auto-Refresh</span>
+          </label>
+
+          <button
+            onClick={() => fetchMetrics(false)}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-xs font-bold shadow-sm shadow-blue-900/20 transition disabled:opacity-50"
+          >
+            <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh Now
+          </button>
+        </div>
       </div>
+
+      {errorNotice && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center justify-between">
+          <span>{errorNotice}</span>
+          <button onClick={() => fetchMetrics(false)} className="font-bold underline ml-2">Retry</button>
+        </div>
+      )}
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -145,21 +180,21 @@ export default function DashboardOverview() {
             <p className="text-3xl font-extrabold text-[#0055b8] mt-2">{totalDownloads.toLocaleString()}</p>
           </div>
           <div className="mt-4 flex items-center gap-1.5 text-xs text-blue-700 font-semibold bg-blue-50 px-2 py-1 rounded">
-            <span>↑ Active Content CMS</span>
+            <span>Live Document Repo</span>
           </div>
         </div>
 
-        {/* Customer Sentiment */}
+        {/* End User Sentiment */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs border-t-4 border-t-[#FFCC00] flex flex-col justify-between">
           <div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Sentiment (VOC)</span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">End User Sentiment (VOC)</span>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-extrabold text-slate-900">{avgRating}</span>
-              <span className="text-xs font-bold text-[#F5B800]">★ ★ ★ ★ ☆</span>
+              <span className="text-xs font-bold text-[#F5B800]">/ 5.0</span>
             </div>
           </div>
           <div className="mt-4 text-xs text-slate-500 font-medium bg-amber-50 px-2 py-1 rounded">
-            Across <span className="font-bold text-slate-800">{totalFeedback}</span> customer reviews
+            Across <span className="font-bold text-slate-800">{totalFeedback}</span> end-user reviews
           </div>
         </div>
 
@@ -168,11 +203,11 @@ export default function DashboardOverview() {
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Search Discoveries</span>
             <p className="text-3xl font-extrabold text-[#0055b8] mt-2">
-              {catalogueMetrics?.top_searches?.reduce((a, b) => a + (b.hit_count || 0), 0) || 746}
+              {totalSearches.toLocaleString()}
             </p>
           </div>
           <div className="mt-4 text-xs text-blue-700 font-semibold bg-blue-50 px-2 py-1 rounded">
-            6-Tier Search Engine Hits
+            Search Queries Logged
           </div>
         </div>
 
@@ -181,11 +216,11 @@ export default function DashboardOverview() {
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Saved Bookmarks</span>
             <p className="text-3xl font-extrabold text-slate-900 mt-2">
-              {catalogueMetrics?.top_bookmarked_products?.reduce((a, b) => a + (b.bookmark_count || 0), 0) || 170}
+              {totalBookmarks.toLocaleString()}
             </p>
           </div>
           <div className="mt-4 text-xs text-slate-700 font-semibold bg-slate-100 px-2 py-1 rounded">
-            Saved to User Devices
+            Active User Bookmarks
           </div>
         </div>
       </div>
@@ -212,7 +247,7 @@ export default function DashboardOverview() {
                     </span>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-sm font-extrabold text-slate-900">{doc.download_count}</span>
+                    <span className="text-sm font-extrabold text-slate-900">{doc.download_count || 0}</span>
                     <p className="text-[10px] text-slate-500 font-medium">downloads</p>
                   </div>
                 </div>
@@ -223,10 +258,10 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-        {/* Customer Feedback VOC Rating Distribution */}
+        {/* End User Feedback VOC Rating Distribution */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
           <h3 className="text-base font-bold text-slate-900 tracking-tight mb-4 flex items-center justify-between">
-            <span>Customer Satisfaction Breakdown</span>
+            <span>End User Satisfaction Breakdown</span>
             <span className="text-xs font-bold text-slate-900 bg-[#FFCC00] px-2.5 py-0.5 rounded">
               VOC Rating
             </span>

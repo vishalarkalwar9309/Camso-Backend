@@ -124,16 +124,16 @@ flutter run
 
 ---
 
-## 5. Demo Accounts Quick Reference
+## 5. Demo Accounts & Environment Configuration Quick Reference
 
-The backend database seed includes pre-configured accounts matching the Flutter client's demo login options:
+The backend database seed (`npm run seed:demo`) configures demo accounts matching the mobile client and Admin CMS. Standardized environment variables in `.env`:
 
-| Role | Email | Password | Organization / Description |
-|---|---|---|---|
-| **CAMSO Admin** | `demo.admin@camso.local` | `AdminPassword123!` | CAMSO Central Platform — Full CMS & Admin RBAC |
-| **Dealer** | `demo.dealer@camso.local` | `DealerPassword123!` | Alpine Equipment GmbH — Approved dealer portal |
-| **Distributor** | `distributor@camso.local` | `DistributorPassword123!` | CEAT Specialty Tires Europe — Distributor network |
-| **Employee** | `employee@ceat.com` | `EmployeePassword123!` | CEAT Specialty Tyres Ltd. — Internal staff |
-| **OEM Partner** | `oem@caterpillar.partner` | `OemPassword123!` | Caterpillar Global OEM — Fitment guides & specs |
-| **End User** | `demo.user@camso.local` | `UserPassword123!` | Registered customer with personal bookmarks |
-| **Guest** | *(Device ID auto-generated)* | *(No password)* | Public catalogue, guest bookmarks, calculators |
+| Experience / Persona | Standard Email Variable | Standard Password Variable | Default Email | Auth Endpoint / Mechanism | Backend Role & Notes |
+|---|---|---|---|---|---|
+| **End User** | `DEMO_END_USER_EMAIL` | `DEMO_END_USER_PASSWORD` *(fallback: `DEMO_CUSTOMER_PASSWORD`)* | `demo.customer@camso.local` | `POST /api/v1/auth/login` | `User` table (`is_guest: false`). Registered end user with personal bookmarks and VOC feedback. |
+| **CAMSO Admin** | `DEMO_ADMIN_EMAIL` | `DEMO_ADMIN_PASSWORD` | `demo.admin@camso.local` | `POST /api/v1/admin-auth/login` | `AdminUser` table (`SUPER_ADMIN`). Full access to Admin CMS, user management, and broadcast dispatch. |
+| **Dealer** | `DEMO_DEALER_EMAIL` | `DEMO_DEALER_PASSWORD` | `demo.dealer@camso.local` | `POST /api/v1/business-auth/login` | `BusinessUser` table (`DEALER`, org code `ORG-DEALER-DEMO`). Scoped dealer portal & document access. |
+| **Distributor** | `DEMO_DISTRIBUTOR_EMAIL` | `DEMO_DISTRIBUTOR_PASSWORD` | `demo.distributor@camso.local` | `POST /api/v1/business-auth/login` | `BusinessUser` table (`DISTRIBUTOR`, org code `ORG-DISTRIB-DEMO`). Scoped distributor portal access. |
+| **OEM Partner** | `DEMO_OEM_EMAIL` | `DEMO_OEM_PASSWORD` | `demo.oem@camso.local` | `POST /api/v1/business-auth/login` | `BusinessUser` table (`OEM_PARTNER`, org code `ORG-OEM-DEMO`). Scoped OEM portal & technical fitment specs. |
+| **Employee** | `DEMO_EMPLOYEE_EMAIL` | `DEMO_EMPLOYEE_PASSWORD` | `employee@ceat.com` | Client Fast Login (`demo_mode_employee_token`) | Offline demo persona in mobile app for sales rep walkthroughs. No database table or role. |
+| **Guest** | *(None)* | *(Passwordless)* | *(Device ID auto-generated)* | `POST /api/v1/auth/guest` or client session | `User` table (`is_guest: true`). Public catalogue, calculators, dealer locator. |

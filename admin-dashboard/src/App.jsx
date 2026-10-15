@@ -43,6 +43,7 @@ import TestimonialsManager from './pages/TestimonialsManager';
 import DealersManager from './pages/DealersManager';
 import FeedbackManager from './pages/FeedbackManager';
 import CampaignsManager from './pages/CampaignsManager';
+import ErrorBoundary from './components/ErrorBoundary';
 
 /**
  * MainAppContent
@@ -130,7 +131,9 @@ function MainAppContent() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header title={tabMeta.title} subtitle={tabMeta.subtitle} />
         <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto overflow-y-auto">
-          {renderActiveView()}
+          <ErrorBoundary key={currentTab} onNavigateOverview={() => setCurrentTab('overview')}>
+            {renderActiveView()}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

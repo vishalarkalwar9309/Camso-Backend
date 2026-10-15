@@ -95,9 +95,16 @@ export default function DealersManager() {
       if (activeFilter !== '') params.is_active = activeFilter;
 
       const res = await api.get('/admin/dealers', params);
-      setDealers(res.data || []);
-      if (res.meta?.pagination) {
-        setPagination(res.meta.pagination);
+      const list = Array.isArray(res.data) ? res.data : (res.data?.dealers || []);
+      setDealers(list);
+      const meta = res.meta?.pagination || res.meta;
+      if (meta && typeof meta.totalPages === 'number') {
+        setPagination({
+          page: meta.page || 1,
+          pageSize: meta.pageSize || 15,
+          total: meta.total || list.length,
+          totalPages: meta.totalPages || 1,
+        });
       }
     } catch (err) {
       setError(err.message || 'Failed to load dealers');
@@ -138,8 +145,8 @@ export default function DealersManager() {
       city: dealer.city || '',
       state: dealer.state || '',
       country: dealer.country || 'US',
-      geo_lat: dealer.geo_lat ?? 0,
-      geo_lng: dealer.geo_lng ?? 0,
+      geo_lat: Number(dealer.geo_lat) || 0,
+      geo_lng: Number(dealer.geo_lng) || 0,
       phone: dealer.phone || '',
       email: dealer.email || '',
       has_csr: !!dealer.has_csr,
@@ -271,7 +278,7 @@ export default function DealersManager() {
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-900">{dealer.name}</div>
                       <div className="text-[11px] text-slate-400 font-mono">
-                        {dealer.geo_lat?.toFixed(4)}, {dealer.geo_lng?.toFixed(4)}
+                        {Number(dealer.geo_lat)?.toFixed(4) || '0.0000'}, {Number(dealer.geo_lng)?.toFixed(4) || '0.0000'}
                       </div>
                     </td>
                     <td className="px-4 py-3">

@@ -27,13 +27,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 
-const BUCKETS = ['BUG', 'FEATURE', 'EXPERIENCE', 'CATALOGUE', 'OTHER'];
+const BUCKETS = ['PRODUCT', 'SERVICE', 'PRICING'];
 
 /**
  * FeedbackManager
  *
  * USE OF FUNCTION:
- *   Main React view component for reviewing customer feedback and exporting CSV datasets in Blue/White theme.
+ *   Main React view component for reviewing end user feedback and exporting CSV datasets in Blue/White theme.
  *
  * HOW DOES THE SPECIFIC FUNCTION WORK:
  *   1. Fetches paginated feedback from GET /api/v1/admin/feedback with bucket and rating filters.
@@ -51,7 +51,7 @@ const BUCKETS = ['BUG', 'FEATURE', 'EXPERIENCE', 'CATALOGUE', 'OTHER'];
  *
  * FINAL OUTPUT OF THE FUNCTION:
  *   Before: Previous red-accented view.
- *   After: Branded Blue & White customer VOC feedback portal with CEAT Yellow star ratings.
+ *   After: Branded Blue & White end user VOC feedback portal with CEAT Yellow star ratings.
  */
 export default function FeedbackManager() {
   const [feedbackList, setFeedbackList] = useState([]);
@@ -73,9 +73,16 @@ export default function FeedbackManager() {
       if (ratingFilter) params.rating = ratingFilter;
 
       const res = await api.get('/admin/feedback', params);
-      setFeedbackList(res.data || []);
-      if (res.meta?.pagination) {
-        setPagination(res.meta.pagination);
+      const list = Array.isArray(res.data) ? res.data : (res.data?.items || res.data?.feedback || []);
+      setFeedbackList(list);
+      const meta = res.meta?.pagination || res.meta;
+      if (meta && typeof meta.totalPages === 'number') {
+        setPagination({
+          page: meta.page || 1,
+          pageSize: meta.pageSize || 15,
+          total: meta.total || list.length,
+          totalPages: meta.totalPages || 1,
+        });
       }
     } catch (err) {
       setError(err.message || 'Failed to load feedback');
@@ -130,8 +137,8 @@ export default function FeedbackManager() {
       {/* Header & Export Action */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Voice of Customer (VOC) & Feedback</h2>
-          <p className="text-sm text-slate-500 font-normal mt-0.5">Review customer ratings, app feedback, bug reports, and export raw data to CSV</p>
+          <h2 className="text-xl font-bold text-slate-900">End User Voice of Customer (VOC) & Feedback</h2>
+          <p className="text-sm text-slate-500 font-normal mt-0.5">Review end user ratings, application feedback, and export raw datasets to CSV</p>
         </div>
         <button
           onClick={handleExportCsv}

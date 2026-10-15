@@ -25,7 +25,7 @@ const { PrismaClient } = require('@prisma/client');
 const { hashPassword } = require('../src/core/utils/password');
 
 const REQUIRED_DEMO_ENV_VARS = [
-  'DEMO_CUSTOMER_PASSWORD',
+  'DEMO_END_USER_PASSWORD (or DEMO_CUSTOMER_PASSWORD)',
   'DEMO_ADMIN_PASSWORD',
   'DEMO_DEALER_PASSWORD',
   'DEMO_DISTRIBUTOR_PASSWORD',
@@ -84,10 +84,10 @@ function validateEnvironment(env = process.env) {
  * @returns {{ customerPass: string, adminPass: string, dealerPass: string, distribPass: string }}
  */
 function validateDemoCredentials(env = process.env) {
-  const endUserPass = env.DEMO_ENDUSER_PASSWORD || env.DEMO_CUSTOMER_PASSWORD;
+  const endUserPass = env.DEMO_END_USER_PASSWORD || env.DEMO_ENDUSER_PASSWORD || env.DEMO_CUSTOMER_PASSWORD;
   const missing = [];
   if (!endUserPass || endUserPass.trim() === '') {
-    missing.push('DEMO_ENDUSER_PASSWORD (or DEMO_CUSTOMER_PASSWORD)');
+    missing.push('DEMO_END_USER_PASSWORD (or DEMO_CUSTOMER_PASSWORD)');
   }
   if (!env.DEMO_ADMIN_PASSWORD || env.DEMO_ADMIN_PASSWORD.trim() === '') {
     missing.push('DEMO_ADMIN_PASSWORD');
@@ -108,10 +108,11 @@ function validateDemoCredentials(env = process.env) {
   }
 
   const creds = {
-    customerPass: endUserPass,
-    adminPass: env.DEMO_ADMIN_PASSWORD,
-    dealerPass: env.DEMO_DEALER_PASSWORD,
-    distribPass: env.DEMO_DISTRIBUTOR_PASSWORD,
+    customerPass: endUserPass.trim(),
+    endUserPass: endUserPass.trim(),
+    adminPass: env.DEMO_ADMIN_PASSWORD.trim(),
+    dealerPass: env.DEMO_DEALER_PASSWORD.trim(),
+    distribPass: env.DEMO_DISTRIBUTOR_PASSWORD.trim(),
   };
 
   if (env.DEMO_OEM_PASSWORD && env.DEMO_OEM_PASSWORD.trim() !== '') {
@@ -126,15 +127,16 @@ function validateDemoCredentials(env = process.env) {
  *
  * @param {PrismaClient} prisma
  * @param {object} credentials
+ * @param {object} [env]
  * @returns {Promise<{ created: string[], existed: string[] }>}
  */
-async function seedDemoAccounts(prisma, credentials) {
+async function seedDemoAccounts(prisma, credentials, env = process.env) {
   const results = { created: [], existed: [] };
 
   // ---------------------------------------------------------------------------
   // 1. End User Persona (formerly Customer)
   // ---------------------------------------------------------------------------
-  const customerEmail = 'demo.customer@camso.local';
+  const customerEmail = env.DEMO_END_USER_EMAIL || env.DEMO_CUSTOMER_EMAIL || 'demo.customer@camso.local';
   const existingCustomer = await prisma.user.findUnique({
     where: { email: customerEmail },
     select: { id: true, display_name: true, is_guest: true, is_active: true },
@@ -165,7 +167,7 @@ async function seedDemoAccounts(prisma, credentials) {
   // ---------------------------------------------------------------------------
   // 2. Super Admin Persona
   // ---------------------------------------------------------------------------
-  const adminEmail = 'demo.admin@camso.local';
+  const adminEmail = env.DEMO_ADMIN_EMAIL || 'demo.admin@camso.local';
   const existingAdmin = await prisma.adminUser.findUnique({
     where: { email: adminEmail },
     select: { id: true, role: true, is_active: true },
@@ -193,7 +195,7 @@ async function seedDemoAccounts(prisma, credentials) {
   // 3. Dealer Organization & Staff Persona
   // ---------------------------------------------------------------------------
   const dealerCode = 'ORG-DEALER-DEMO';
-  const dealerEmail = 'demo.dealer@camso.local';
+  const dealerEmail = env.DEMO_DEALER_EMAIL || 'demo.dealer@camso.local';
 
   const existingDealerOrg = await prisma.businessOrganization.findUnique({
     where: { code: dealerCode },
@@ -246,7 +248,7 @@ async function seedDemoAccounts(prisma, credentials) {
   // 4. Distributor Organization & Staff Persona
   // ---------------------------------------------------------------------------
   const distribCode = 'ORG-DISTRIB-DEMO';
-  const distribEmail = 'demo.distributor@camso.local';
+  const distribEmail = env.DEMO_DISTRIBUTOR_EMAIL || 'demo.distributor@camso.local';
 
   const existingDistribOrg = await prisma.businessOrganization.findUnique({
     where: { code: distribCode },
@@ -300,7 +302,7 @@ async function seedDemoAccounts(prisma, credentials) {
   // ---------------------------------------------------------------------------
   if (credentials.oemPass) {
     const oemCode = 'ORG-OEM-DEMO';
-    const oemEmail = 'demo.oem@camso.local';
+    const oemEmail = env.DEMO_OEM_EMAIL || 'demo.oem@camso.local';
 
     const existingOemOrg = await prisma.businessOrganization.findUnique({
       where: { code: oemCode },
@@ -367,7 +369,7 @@ async function main() {
   const prisma = new PrismaClient({ log: ['warn', 'error'] });
 
   try {
-    const { created, existed } = await seedDemoAccounts(prisma, credentials);
+    const { created, existed } = await seedDemoAccounts(prisma, credentials, process.env);
     console.log(`\nExecution Summary:`);
     console.log(`  Newly Created: ${created.length}`);
     created.forEach((c) => console.log(`    + ${c}`));

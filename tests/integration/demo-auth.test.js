@@ -11,9 +11,13 @@ const request = require('supertest');
 const app = require('../../src/app');
 const prisma = require('../../src/config/database');
 
-const customerPassword = process.env.DEMO_CUSTOMER_PASSWORD;
+const customerEmail = process.env.DEMO_END_USER_EMAIL || process.env.DEMO_CUSTOMER_EMAIL || 'demo.customer@camso.local';
+const customerPassword = process.env.DEMO_END_USER_PASSWORD || process.env.DEMO_CUSTOMER_PASSWORD;
+const adminEmail = process.env.DEMO_ADMIN_EMAIL || 'demo.admin@camso.local';
 const adminPassword = process.env.DEMO_ADMIN_PASSWORD;
+const dealerEmail = process.env.DEMO_DEALER_EMAIL || 'demo.dealer@camso.local';
 const dealerPassword = process.env.DEMO_DEALER_PASSWORD;
+const distribEmail = process.env.DEMO_DISTRIBUTOR_EMAIL || 'demo.distributor@camso.local';
 const distribPassword = process.env.DEMO_DISTRIBUTOR_PASSWORD;
 
 const hasCredentials = Boolean(
@@ -37,21 +41,21 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
   });
 
   // ---------------------------------------------------------------------------
-  // 1. Customer Persona
+  // 1. End User / Customer Persona
   // ---------------------------------------------------------------------------
-  describe('Customer Persona (demo.customer@camso.local)', () => {
+  describe(`End User Persona (${customerEmail})`, () => {
     it('authenticates via POST /api/v1/auth/login and receives access token', async () => {
       const res = await request(app)
         .post('/api/v1/auth/login')
         .send({
-          email: 'demo.customer@camso.local',
+          email: customerEmail,
           password: customerPassword,
         });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.access_token).toBeDefined();
-      expect(res.body.data.user.email).toBe('demo.customer@camso.local');
+      expect(res.body.data.user.email).toBe(customerEmail);
       expect(res.body.data.user.is_guest).toBe(false);
 
       customerToken = res.body.data.access_token;
@@ -64,7 +68,7 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.email).toBe('demo.customer@camso.local');
+      expect(res.body.data.email).toBe(customerEmail);
     });
 
     it('is blocked from admin routes (GET /api/v1/admin/admin-users) with 401/403', async () => {
@@ -87,12 +91,12 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
   // ---------------------------------------------------------------------------
   // 2. Super Admin Persona
   // ---------------------------------------------------------------------------
-  describe('Super Admin Persona (demo.admin@camso.local)', () => {
+  describe(`Super Admin Persona (${adminEmail})`, () => {
     it('authenticates via POST /api/v1/admin-auth/login and receives SUPER_ADMIN token', async () => {
       const res = await request(app)
         .post('/api/v1/admin-auth/login')
         .send({
-          email: 'demo.admin@camso.local',
+          email: adminEmail,
           password: adminPassword,
         });
 
@@ -108,7 +112,7 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
       expect(res.body.data.tokens.access_token).toBe(res.body.data.access_token);
       expect(res.body.data.tokens.refresh_token).toBe(res.body.data.refresh_token);
 
-      expect(res.body.data.admin.email).toBe('demo.admin@camso.local');
+      expect(res.body.data.admin.email).toBe(adminEmail);
       expect(res.body.data.admin.role).toBe('SUPER_ADMIN');
 
       adminToken = res.body.data.access_token;
@@ -153,19 +157,19 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
   // ---------------------------------------------------------------------------
   // 3. Dealer Persona
   // ---------------------------------------------------------------------------
-  describe('Dealer Persona (demo.dealer@camso.local)', () => {
+  describe(`Dealer Persona (${dealerEmail})`, () => {
     it('authenticates via POST /api/v1/business-auth/login and receives DEALER token', async () => {
       const res = await request(app)
         .post('/api/v1/business-auth/login')
         .send({
-          email: 'demo.dealer@camso.local',
+          email: dealerEmail,
           password: dealerPassword,
         });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.tokens.access_token).toBeDefined();
-      expect(res.body.data.user.email).toBe('demo.dealer@camso.local');
+      expect(res.body.data.user.email).toBe(dealerEmail);
       expect(res.body.data.user.role).toBe('DEALER');
       expect(res.body.data.organization.code).toBe('ORG-DEALER-DEMO');
 
@@ -206,19 +210,19 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
   // ---------------------------------------------------------------------------
   // 4. Distributor Persona
   // ---------------------------------------------------------------------------
-  describe('Distributor Persona (demo.distributor@camso.local)', () => {
+  describe(`Distributor Persona (${distribEmail})`, () => {
     it('authenticates via POST /api/v1/business-auth/login and receives DISTRIBUTOR token', async () => {
       const res = await request(app)
         .post('/api/v1/business-auth/login')
         .send({
-          email: 'demo.distributor@camso.local',
+          email: distribEmail,
           password: distribPassword,
         });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.tokens.access_token).toBeDefined();
-      expect(res.body.data.user.email).toBe('demo.distributor@camso.local');
+      expect(res.body.data.user.email).toBe(distribEmail);
       expect(res.body.data.user.role).toBe('DISTRIBUTOR');
       expect(res.body.data.organization.code).toBe('ORG-DISTRIB-DEMO');
 

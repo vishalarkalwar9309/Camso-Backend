@@ -100,10 +100,24 @@ describe('prisma/seed.demo.js unit tests', () => {
       const result = validateDemoCredentials(validEnv);
       expect(result).toEqual({
         customerPass: 'CustomerPass123!',
+        endUserPass: 'CustomerPass123!',
         adminPass: 'AdminPass123!',
         dealerPass: 'DealerPass123!',
         distribPass: 'DistribPass123!',
       });
+    });
+
+    it('accepts DEMO_END_USER_PASSWORD with backward-compatible fallback to DEMO_CUSTOMER_PASSWORD', () => {
+      const modernEnv = {
+        DEMO_END_USER_PASSWORD: 'EndUserPass456!',
+        DEMO_ADMIN_PASSWORD: 'AdminPass123!',
+        DEMO_DEALER_PASSWORD: 'DealerPass123!',
+        DEMO_DISTRIBUTOR_PASSWORD: 'DistribPass123!',
+      };
+
+      const result = validateDemoCredentials(modernEnv);
+      expect(result.customerPass).toBe('EndUserPass456!');
+      expect(result.endUserPass).toBe('EndUserPass456!');
     });
 
     it('attaches oemPass when DEMO_OEM_PASSWORD is provided', () => {
@@ -118,6 +132,7 @@ describe('prisma/seed.demo.js unit tests', () => {
       const result = validateDemoCredentials(envWithOem);
       expect(result).toEqual({
         customerPass: 'CustomerPass123!',
+        endUserPass: 'CustomerPass123!',
         adminPass: 'AdminPass123!',
         dealerPass: 'DealerPass123!',
         distribPass: 'DistribPass123!',

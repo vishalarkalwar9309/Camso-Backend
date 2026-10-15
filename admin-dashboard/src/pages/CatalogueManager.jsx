@@ -85,6 +85,28 @@ const SAMPLE_PRODUCTS = [
  *   Before: Previous red-accented view.
  *   After: Branded Blue & White product catalogue explorer.
  */
+function getProductCategoryName(p) {
+  if (!p) return 'Tire & Track';
+  if (typeof p.category === 'object' && p.category !== null) {
+    return p.category.name || p.category.slug || 'Tire & Track';
+  }
+  return p.category || 'Tire & Track';
+}
+
+function getProductSpecs(p) {
+  if (!p) return null;
+  if (p.specs && typeof p.specs === 'object') return p.specs;
+  if (Array.isArray(p.specifications) && p.specifications.length > 0) {
+    return p.specifications.reduce((acc, s) => {
+      const key = s.spec_key || 'Specification';
+      const val = s.unit ? `${s.spec_value} ${s.unit}` : s.spec_value;
+      acc[key] = val;
+      return acc;
+    }, {});
+  }
+  return null;
+}
+
 export default function CatalogueManager() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -103,14 +125,26 @@ export default function CatalogueManager() {
           api.get('/products'),
         ]);
 
-        if (catRes.status === 'fulfilled' && catRes.value.data?.length) {
-          setCategories(catRes.value.data);
+        if (catRes.status === 'fulfilled' && catRes.value) {
+          const rawCats = catRes.value.data || catRes.value;
+          const catList = Array.isArray(rawCats) ? rawCats : (rawCats?.items || rawCats?.categories || []);
+          if (catList.length > 0) {
+            setCategories(catList);
+          } else {
+            setCategories(SAMPLE_CATEGORIES);
+          }
         } else {
           setCategories(SAMPLE_CATEGORIES);
         }
 
-        if (prodRes.status === 'fulfilled' && prodRes.value.data?.length) {
-          setProducts(prodRes.value.data);
+        if (prodRes.status === 'fulfilled' && prodRes.value) {
+          const rawProds = prodRes.value.data || prodRes.value;
+          const prodList = Array.isArray(rawProds) ? rawProds : (rawProds?.items || rawProds?.products || []);
+          if (prodList.length > 0) {
+            setProducts(prodList);
+          } else {
+            setProducts(SAMPLE_PRODUCTS);
+          }
         } else {
           setProducts(SAMPLE_PRODUCTS);
         }
@@ -125,10 +159,17 @@ export default function CatalogueManager() {
   }, []);
 
   const filteredProducts = products.filter((p) => {
-    const matchesCategory = !activeCategory || p.category === activeCategory || p.category_id === activeCategory;
+    const catName = getProductCategoryName(p);
+    const catId = typeof p.category === 'object' && p.category !== null ? p.category.id : p.category_id;
+    const matchesCategory = !activeCategory ||
+      catName === activeCategory ||
+      catId === activeCategory ||
+      (typeof p.category === 'string' && p.category === activeCategory);
+
+    const partNum = p.pid || p.part_number || '';
     const matchesSearch = !search ||
       p.name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.part_number?.toLowerCase().includes(search.toLowerCase()) ||
+      partNum.toLowerCase().includes(search.toLowerCase()) ||
       p.description?.toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -156,19 +197,23 @@ export default function CatalogueManager() {
           >
             All Categories ({products.length})
           </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id || cat.code}
-              onClick={() => setActiveCategory(cat.name || cat.code)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${
-                activeCategory === (cat.name || cat.code)
-                  ? 'bg-[#0055b8] text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {cat.name || cat.code}
-            </button>
-          ))}
+          {categories.map((cat) => {
+            const catLabel = cat.name || cat.code || cat.slug || 'Category';
+            const catKey = cat.id || cat.code || catLabel;
+            return (
+              <button
+                key={catKey}
+                onClick={() => setActiveCategory(catLabel)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+                  activeCategory === catLabel
+                    ? 'bg-[#0055b8] text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {catLabel}
+              </button>
+            );
+          })}
         </div>
 
         <div>
@@ -202,24 +247,30 @@ export default function CatalogueManager() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[#0055b8] uppercase tracking-wide">
-                    {p.category || 'Tire & Track'}
+                    {getProductCategoryName(p)}
                   </span>
-                  <span className="text-xs font-mono font-semibold text-slate-400">{p.part_number}</span>
+                  <span className="text-xs font-mono font-semibold text-slate-400">
+                    {p.pid || p.part_number || 'N/A'}
+                  </span>
                 </div>
                 <h3 className="font-bold text-slate-900 text-base">{p.name}</h3>
                 <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{p.description}</p>
               </div>
 
-              {p.specs && (
-                <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-[11px]">
-                  {Object.entries(p.specs).slice(0, 2).map(([key, val]) => (
-                    <div key={key} className="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">{key}</span>
-                      <span className="font-bold text-slate-800">{val}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                const specs = getProductSpecs(p);
+                if (!specs || Object.keys(specs).length === 0) return null;
+                return (
+                  <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-[11px]">
+                    {Object.entries(specs).slice(0, 2).map(([key, val]) => (
+                      <div key={key} className="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">{key}</span>
+                        <span className="font-bold text-slate-800">{val}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -232,10 +283,10 @@ export default function CatalogueManager() {
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-xs font-bold text-[#0055b8] uppercase tracking-wide">
-                  {selectedProduct.category}
+                  {getProductCategoryName(selectedProduct)}
                 </span>
                 <h3 className="text-lg font-bold text-slate-900">{selectedProduct.name}</h3>
-                <p className="text-xs text-slate-400 font-mono font-medium">Part #{selectedProduct.part_number}</p>
+                <p className="text-xs text-slate-400 font-mono font-medium">Part #{selectedProduct.pid || selectedProduct.part_number || 'N/A'}</p>
               </div>
               <button
                 onClick={() => setSelectedProduct(null)}
@@ -249,19 +300,23 @@ export default function CatalogueManager() {
 
             <p className="text-sm text-slate-600 leading-relaxed">{selectedProduct.description}</p>
 
-            {selectedProduct.specs && (
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Technical Specifications</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(selectedProduct.specs).map(([k, v]) => (
-                    <div key={k} className="p-2.5 bg-blue-50/40 rounded-lg border border-blue-100 text-xs">
-                      <div className="text-slate-400 font-bold uppercase text-[10px]">{k}</div>
-                      <div className="font-bold text-slate-800">{v}</div>
-                    </div>
-                  ))}
+            {(() => {
+              const specs = getProductSpecs(selectedProduct);
+              if (!specs || Object.keys(specs).length === 0) return null;
+              return (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Technical Specifications</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(specs).map(([k, v]) => (
+                      <div key={k} className="p-2.5 bg-blue-50/40 rounded-lg border border-blue-100 text-xs">
+                        <div className="text-slate-400 font-bold uppercase text-[10px]">{k}</div>
+                        <div className="font-bold text-slate-800">{v}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="pt-2 flex justify-end">
               <button
