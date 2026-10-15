@@ -86,8 +86,8 @@ export function AuthProvider({ children }) {
         }
       }
 
-      const receivedToken = res.data.accessToken || res.data.token;
-      const receivedUser = res.data.user || res.data.adminUser || { email, role: 'SUPER_ADMIN' };
+      const receivedToken = res.data.accessToken || res.data.token || res.data.access_token || res.data.tokens?.accessToken || res.data.tokens?.access_token;
+      const receivedUser = res.data.admin || res.data.user || res.data.adminUser || { email, role: 'SUPER_ADMIN' };
 
       setAuthToken(receivedToken);
       setStoredUser(receivedUser);

@@ -21,7 +21,7 @@
  *   Exported api object and token utility functions.
  */
 
-const BASE_URL = '/api/v1';
+const BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://camso-backend.onrender.com/api/v1' : '/api/v1');
 
 /**
  * getAuthToken

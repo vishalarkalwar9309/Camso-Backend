@@ -30,3 +30,23 @@ services:
         value: Camso documents
       - key: ALLOWED_ORIGINS
         value: "*"
+
+  - type: static
+    name: camso-admin-dashboard
+    plan: free
+    region: singapore
+    rootDir: admin-dashboard
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+    envVars:
+      - key: VITE_API_URL
+        value: https://camso-backend.onrender.com/api/v1
+

@@ -98,14 +98,23 @@ describeDb('Gate 2B Demo Accounts — Live Authentication & Boundary Verificatio
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      // Top-level tokens (backward compatibility)
       expect(res.body.data.access_token).toBeDefined();
+      expect(res.body.data.refresh_token).toBeDefined();
+      // Nested tokens object with dual camelCase and snake_case aliases
+      expect(res.body.data.tokens).toBeDefined();
+      expect(res.body.data.tokens.accessToken).toBe(res.body.data.access_token);
+      expect(res.body.data.tokens.refreshToken).toBe(res.body.data.refresh_token);
+      expect(res.body.data.tokens.access_token).toBe(res.body.data.access_token);
+      expect(res.body.data.tokens.refresh_token).toBe(res.body.data.refresh_token);
+
       expect(res.body.data.admin.email).toBe('demo.admin@camso.local');
       expect(res.body.data.admin.role).toBe('SUPER_ADMIN');
 
       adminToken = res.body.data.access_token;
     });
 
-    it('can access admin self profile GET /api/v1/admin-auth/me', async () => {
+    it('can access admin self profile GET /api/v1/admin-auth/me using tokens.accessToken', async () => {
       const res = await request(app)
         .get('/api/v1/admin-auth/me')
         .set('Authorization', `Bearer ${adminToken}`);

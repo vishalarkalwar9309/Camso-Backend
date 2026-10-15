@@ -13,7 +13,19 @@ const asyncHandler = require('../../core/utils/asyncHandler');
  */
 const login = asyncHandler(async (req, res) => {
   const { tokens, admin } = await service.login(req.body);
-  sendSuccess(res, { ...tokens, admin }, 200);
+  const formattedTokens = {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+  };
+  sendSuccess(res, {
+    ...tokens,
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    tokens: formattedTokens,
+    admin,
+  }, 200);
 });
 
 /**
@@ -21,7 +33,18 @@ const login = asyncHandler(async (req, res) => {
  */
 const refresh = asyncHandler(async (req, res) => {
   const { tokens } = await service.refresh(req.body);
-  sendSuccess(res, tokens, 200);
+  const formattedTokens = {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+  };
+  sendSuccess(res, {
+    ...tokens,
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    tokens: formattedTokens,
+  }, 200);
 });
 
 /**
