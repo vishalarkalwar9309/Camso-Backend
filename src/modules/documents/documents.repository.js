@@ -73,8 +73,26 @@ const documentsRepository = {
           product_id: true,
           category_id: true,
           document_type: true,
+          is_published: true,
+          download_count: true,
           created_at: true,
           updated_at: true,
+          files: {
+            select: {
+              id: true,
+              language_code: true,
+              is_offline_downloadable: true,
+              media_asset: {
+                select: {
+                  id: true,
+                  url: true,
+                  filename: true,
+                  mime_type: true,
+                  size_bytes: true,
+                },
+              },
+            },
+          },
         },
       }),
     ]);
@@ -151,8 +169,25 @@ const documentsRepository = {
           category_id: true,
           document_type: true,
           is_published: true,
+          download_count: true,
           created_at: true,
           updated_at: true,
+          files: {
+            select: {
+              id: true,
+              language_code: true,
+              is_offline_downloadable: true,
+              media_asset: {
+                select: {
+                  id: true,
+                  url: true,
+                  filename: true,
+                  mime_type: true,
+                  size_bytes: true,
+                },
+              },
+            },
+          },
         },
       }),
     ]);

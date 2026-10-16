@@ -113,7 +113,7 @@ router.get('/oem/portal', requireBusinessRole('OEM_PARTNER'), async (req, res) =
  */
 router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res, next) => {
   try {
-    const documents = await prisma.document.findMany({
+    const rawDocuments = await prisma.document.findMany({
       where: {
         is_published: true,
         document_type: {
@@ -126,10 +126,67 @@ router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res
             id: true,
             language_code: true,
             is_offline_downloadable: true,
+            media_asset: {
+              select: {
+                id: true,
+                url: true,
+                filename: true,
+                mime_type: true,
+                size_bytes: true,
+              },
+            },
           },
         },
       },
       orderBy: { created_at: 'desc' },
+    });
+
+    const docIds = rawDocuments.map((d) => d.id);
+    const translations = await prisma.translation.findMany({
+      where: {
+        entity_type: { in: ['DOCUMENT', 'document'] },
+        entity_id: { in: docIds },
+        field: 'title',
+      },
+    });
+
+    const titleMap = {};
+    for (const t of translations) {
+      if (!titleMap[t.entity_id] || t.language_code === 'en') {
+        titleMap[t.entity_id] = t.value;
+      }
+    }
+
+    const documents = rawDocuments.map((doc) => {
+      const files = doc.files || [];
+      const primaryFile = files.find((f) => f.language_code === 'en') || files[0] || null;
+      const media = primaryFile?.media_asset || null;
+
+      return {
+        id: doc.id,
+        title: titleMap[doc.id] || doc.document_type.replace(/_/g, ' '),
+        type: doc.document_type,
+        document_type: doc.document_type,
+        category: doc.category_id || 'technical',
+        product_id: doc.product_id,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+        has_file: Boolean(media && media.url),
+        file_size_bytes: media?.size_bytes || null,
+        mime_type: media?.mime_type || 'application/pdf',
+        filename: media?.filename || null,
+        is_offline_downloadable: primaryFile?.is_offline_downloadable ?? false,
+        access_level: 'OEM_PARTNER',
+        download_url: media && media.url ? `/api/v1/documents/${doc.id}/download` : null,
+        files: files.map((f) => ({
+          id: f.id,
+          language_code: f.language_code,
+          is_offline_downloadable: f.is_offline_downloadable,
+          size_bytes: f.media_asset?.size_bytes || null,
+          mime_type: f.media_asset?.mime_type || null,
+          filename: f.media_asset?.filename || null,
+        })),
+      };
     });
 
     sendSuccess(res, documents, 200);

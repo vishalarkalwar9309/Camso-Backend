@@ -30,6 +30,60 @@ const { parsePagination, buildPaginationMeta } = require('../../core/utils/pagin
 const { getTranslations, getManyTranslations, attachTranslations, attachManyTranslations } = require('../../core/utils/translate');
 const ApiError = require('../../core/utils/ApiError');
 
+function resolveDocumentAccessLevel(doc) {
+  if (doc.access_level) {
+    const explicit = String(doc.access_level).toUpperCase();
+    if (['PUBLIC', 'OEM', 'OEM_PARTNER', 'DEALER', 'DISTRIBUTOR', 'RESTRICTED', 'ADMIN'].includes(explicit)) {
+      if (explicit === 'OEM_PARTNER') return 'OEM';
+      return explicit;
+    }
+  }
+
+  const title = (doc.title || '').toLowerCase();
+
+  // 1. OEM partner technical documentation & CAD envelope specifications
+  if (title.includes('oem') || title.includes('cad')) {
+    return 'OEM';
+  }
+
+  // 2. Dealer & Distributor commercial warranty & claim processing guides
+  if (
+    title.includes('warranty') &&
+    (title.includes('dealer') || title.includes('distributor') || title.includes('commercial') || title.includes('claim'))
+  ) {
+    return 'DEALER';
+  }
+
+  // 3. Prototypes and internal test specifications
+  if (title.includes('prototype') || title.includes('internal') || title.includes('test-p')) {
+    return 'RESTRICTED';
+  }
+
+  // 4. Product Technical Datasheets and Engineering Application/Maintenance Guides
+  if (
+    title.includes('datasheet') ||
+    title.includes('data sheet') ||
+    title.includes('spec sheet') ||
+    title.includes('application') ||
+    title.includes('maintenance guide') ||
+    (doc.product_id && (title.includes('guide') || title.includes('spec') || title.includes('manual')))
+  ) {
+    return 'PUBLIC';
+  }
+
+  // 5. Standard Public Types
+  if (['CATALOGUE', 'BROCHURE', 'MANUAL'].includes(doc.document_type)) {
+    return 'PUBLIC';
+  }
+
+  // 6. Generic technical guides and bulletins (restricted to business partners: Dealer, Distributor, OEM)
+  if (['TECHNICAL_GUIDE', 'BULLETIN'].includes(doc.document_type)) {
+    return 'RESTRICTED';
+  }
+
+  return 'PUBLIC';
+}
+
 const documentsService = {
   /**
    * listPublishedDocuments
@@ -62,7 +116,34 @@ const documentsService = {
 
     const docIds = records.map((doc) => doc.id);
     const translations = await getManyTranslations('DOCUMENT', docIds);
-    const documents = attachManyTranslations(records, translations, query.lang || 'en');
+    const rawDocuments = attachManyTranslations(records, translations, query.lang || 'en');
+    const reqLang = query.lang || 'en';
+
+    const documents = rawDocuments.map((doc) => {
+      const files = doc.files || [];
+      const primaryFile = files.find((f) => f.language_code === reqLang) || files[0] || null;
+      const media = primaryFile?.media_asset || null;
+      const accessLevel = resolveDocumentAccessLevel(doc);
+
+      return {
+        ...doc,
+        access_level: accessLevel,
+        has_file: Boolean(media && (media.url || media.storage_path)),
+        file_size_bytes: media?.size_bytes || null,
+        mime_type: media?.mime_type || null,
+        filename: media?.filename || null,
+        is_offline_downloadable: primaryFile?.is_offline_downloadable ?? false,
+        files: files.map((f) => ({
+          id: f.id,
+          language_code: f.language_code,
+          is_offline_downloadable: f.is_offline_downloadable,
+          size_bytes: f.media_asset?.size_bytes || null,
+          mime_type: f.media_asset?.mime_type || null,
+          filename: f.media_asset?.filename || null,
+          media_asset: f.media_asset || undefined,
+        })),
+      };
+    });
 
     return { documents, pagination: meta };
   },
@@ -98,11 +179,28 @@ const documentsService = {
 
     // Resolve document_files for requested language per contract
     const files = doc.files || [];
-    const resolvedFiles = files.filter((f) => f.language_code === lang);
+    const resolvedFiles = lang ? files.filter((f) => f.language_code === lang) : files;
+    const primaryFile = resolvedFiles[0] || files[0] || null;
+    const media = primaryFile?.media_asset || null;
+    const accessLevel = resolveDocumentAccessLevel(localizedDoc);
 
     return {
       ...localizedDoc,
-      files: resolvedFiles,
+      access_level: accessLevel,
+      has_file: Boolean(media && (media.url || media.storage_path)),
+      file_size_bytes: media?.size_bytes || null,
+      mime_type: media?.mime_type || null,
+      filename: media?.filename || null,
+      is_offline_downloadable: primaryFile?.is_offline_downloadable ?? false,
+      files: resolvedFiles.map((f) => ({
+        id: f.id,
+        language_code: f.language_code,
+        is_offline_downloadable: f.is_offline_downloadable,
+        size_bytes: f.media_asset?.size_bytes || null,
+        mime_type: f.media_asset?.mime_type || null,
+        filename: f.media_asset?.filename || null,
+        media_asset: f.media_asset || undefined,
+      })),
     };
   },
   async listAdminDocuments(filters, query) {
@@ -117,7 +215,14 @@ const documentsService = {
 
     const docIds = records.map((doc) => doc.id);
     const translations = await getManyTranslations('DOCUMENT', docIds);
-    const documents = attachManyTranslations(records, translations, query.lang || 'en');
+    const rawDocuments = attachManyTranslations(records, translations, query.lang || 'en');
+
+    const documents = rawDocuments.map((doc) => ({
+      ...doc,
+      has_file: (doc.files || []).length > 0,
+      file_count: (doc.files || []).length,
+      files: doc.files || [],
+    }));
 
     return { documents, pagination: meta };
   },
@@ -245,12 +350,11 @@ const documentsService = {
       throw ApiError.notFound('Document not found or unpublished.');
     }
 
-    // Determine access level:
-    // Explicit access_level on doc if defined, otherwise derive from document_type:
-    // CATALOGUE, BROCHURE, WARRANTY, MANUAL are PUBLIC.
-    // TECHNICAL_GUIDE, BULLETIN are RESTRICTED.
-    const explicitLevel = doc.access_level ? String(doc.access_level).toUpperCase() : null;
-    const isPublic = explicitLevel ? explicitLevel === 'PUBLIC' : ['CATALOGUE', 'BROCHURE', 'WARRANTY', 'MANUAL'].includes(doc.document_type);
+    const translations = await getTranslations('DOCUMENT', doc.id);
+    const localizedDoc = attachTranslations(doc, translations, lang);
+
+    const accessLevel = resolveDocumentAccessLevel(localizedDoc);
+    const isPublic = accessLevel === 'PUBLIC';
 
     if (!isPublic) {
       // 1. Must be authenticated
@@ -267,26 +371,22 @@ const documentsService = {
 
       if (!isSuperOrContentAdmin) {
         // Enforce role-based access
-        if (explicitLevel) {
-          if (explicitLevel === 'DEALER' && role !== 'DEALER') {
-            throw ApiError.forbidden('This document is restricted to authorized Dealers.');
-          }
-          if (explicitLevel === 'DISTRIBUTOR' && role !== 'DISTRIBUTOR') {
-            throw ApiError.forbidden('This document is restricted to regional Distributors.');
-          }
-          if ((explicitLevel === 'OEM' || explicitLevel === 'OEM_PARTNER') && role !== 'OEM_PARTNER') {
-            throw ApiError.forbidden('This document is restricted to OEM Integration Partners.');
-          }
-          if (explicitLevel === 'ADMIN') {
-            throw ApiError.forbidden('This document is restricted to platform Administrators.');
-          }
-        } else {
-          // If no explicit access_level, TECHNICAL_GUIDE and BULLETIN require business or admin role
-          if (['TECHNICAL_GUIDE', 'BULLETIN'].includes(doc.document_type)) {
-            const allowedRoles = ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'];
-            if (!allowedRoles.includes(role)) {
-              throw ApiError.forbidden('Your account role is not authorized to download technical documentation.');
-            }
+        if (accessLevel === 'DEALER' && !['DEALER', 'DISTRIBUTOR'].includes(role)) {
+          throw ApiError.forbidden('This document is restricted to authorized Dealers and Distributors.');
+        }
+        if (accessLevel === 'DISTRIBUTOR' && role !== 'DISTRIBUTOR') {
+          throw ApiError.forbidden('This document is restricted to regional Distributors.');
+        }
+        if ((accessLevel === 'OEM' || accessLevel === 'OEM_PARTNER') && role !== 'OEM_PARTNER') {
+          throw ApiError.forbidden('This document is restricted to OEM Integration Partners.');
+        }
+        if (accessLevel === 'ADMIN') {
+          throw ApiError.forbidden('This document is restricted to platform Administrators.');
+        }
+        if (['TECHNICAL_GUIDE', 'BULLETIN'].includes(doc.document_type)) {
+          const allowedRoles = ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'];
+          if (!allowedRoles.includes(role)) {
+            throw ApiError.forbidden('Your account role is not authorized to download technical documentation.');
           }
         }
 

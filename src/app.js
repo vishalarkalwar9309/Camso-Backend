@@ -30,6 +30,14 @@ const errorHandler = require('./core/middleware/errorHandler');
 
 const app = express();
 
+// Configure trusted proxy for Render / Cloudflare reverse proxy infrastructure.
+// Strictly trusts exactly 1 hop (the immediate Render reverse proxy), ensuring req.ip
+// accurately resolves to the true client IP instead of the shared router internal IP.
+// Avoids trusting arbitrary upstream client headers by specifying 1 hop.
+if (env.isProduction || process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
+
 // 1. Security headers
 app.use(helmet());
 
@@ -61,6 +69,7 @@ const limiter = rateLimit({
   max: env.RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.path === '/ready' || req.originalUrl?.endsWith('/health') || req.originalUrl?.endsWith('/ready'),
   message: {
     success: false,
     error: {
