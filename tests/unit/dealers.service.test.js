@@ -106,6 +106,7 @@ describe('Dealers Service (Unit Tests)', () => {
         lng: -87.6298,
         type: undefined,
         radiusKm: 25,
+        excludeDistributor: true,
       });
       expect(results).toHaveLength(1);
       expect(results[0].latitude).toBeCloseTo(41.8781);

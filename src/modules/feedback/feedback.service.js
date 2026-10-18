@@ -35,6 +35,7 @@ const feedbackService = {
     // Derive identity securely from principal
     const isEndUser = principal.type === 'USER' || principal.type === 'END_USER' || principal.type === 'CUSTOMER' || (principal.is_guest === false);
     const user_id = isEndUser && principal.type !== 'GUEST' ? principal.id : null;
+    const device_id = principal?.deviceId || payload?.device_id || 'mobile-device';
     const feedback = await feedbackRepository.createFeedback({
       ...payload,
       user_id,
@@ -44,7 +45,7 @@ const feedbackService = {
     // Record user activity non-blockingly
     try {
       const { prisma } = require('../../config/database');
-      if (process.env.NODE_ENV !== 'test' && prisma && prisma.userActivity && typeof prisma.userActivity.create === 'function') {
+      if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID && prisma && prisma.userActivity && typeof prisma.userActivity.create === 'function') {
         await prisma.userActivity.create({
           data: {
             user_id,

@@ -30,10 +30,25 @@ const { prisma } = require('../../config/database');
 const dealersRepository = {
   /**
    * findNearest
-   * Use Haversine formula in raw SQL to find dealers within radiusKm.
-   * Parameterized to prevent SQL injection.
+   *
+   * 1. USE OF FUNCTION:
+   *   Finds active dealers located within a radial boundary (radiusKm) from a geographic coordinate (lat, lng).
+   * 2. HOW DOES THE SPECIFIC FUNCTION WORK:
+   *   Executes a raw SQL query using PostgreSQL trigonometrics to calculate spherical distance (Haversine formula).
+   *   Filters on is_active = true, applies optional type filter or excludes DISTRIBUTOR type when caller lacks business permissions,
+   *   filters by distance <= radiusKm, and orders results ascending by distance.
+   * 3. CONCEPTS USED IN THE FUNCTION:
+   *   Haversine spherical distance formula, SQL parameterization via Prisma.sql to prevent injection, PostgreSQL enum casting.
+   * 4. PLACES WHERE THIS FUNCTION IS IMPORTED AND USED:
+   *   Imported and called by src/modules/dealers/dealers.service.js in getLocator().
+   * 5. FINAL OUTPUT OF THE FUNCTION, BEFORE AND AFTER:
+   *   Before: Array of raw dealer records within radius.
+   *   After: Array of raw dealer records within radius, with DISTRIBUTOR records omitted if excludeDistributor is true and no specific type is requested.
+   *
+   * @param {object} params — { lat, lng, type, radiusKm, excludeDistributor }
+   * @returns {Promise<Array<object>>}
    */
-  async findNearest({ lat, lng, type, radiusKm }) {
+  async findNearest({ lat, lng, type, radiusKm, excludeDistributor = false }) {
     // 6371 is the radius of the Earth in km
     let query = Prisma.sql`
       SELECT id, name, type, address, city, state, country, geo_lat, geo_lng, location_url, phone, email, has_csr, is_active,
@@ -44,6 +59,8 @@ const dealersRepository = {
 
     if (type) {
       query = Prisma.sql`${query} AND type = ${type}::"DealerType"`;
+    } else if (excludeDistributor) {
+      query = Prisma.sql`${query} AND type != 'DISTRIBUTOR'::"DealerType"`;
     }
 
     query = Prisma.sql`${query} 
@@ -56,13 +73,32 @@ const dealersRepository = {
 
   /**
    * findAllActive
-   * Find active dealers filtered by optional type and text search query.
+   *
+   * 1. USE OF FUNCTION:
+   *   Retrieves all active dealers matching optional type filter and text search query.
+   * 2. HOW DOES THE SPECIFIC FUNCTION WORK:
+   *   Constructs a Prisma where clause with is_active: true. If type is specified, maps DISTRIBUTOR_HUB to DISTRIBUTOR.
+   *   If type is omitted and excludeDistributor is true, excludes DISTRIBUTOR records.
+   *   If searchQuery is present, performs case-insensitive OR search on name, city, country, and address.
+   *   Executes prisma.dealer.findMany ordered alphabetically by name.
+   * 3. CONCEPTS USED IN THE FUNCTION:
+   *   Prisma relational query builder, case-insensitive substring search, conditional where-clause construction.
+   * 4. PLACES WHERE THIS FUNCTION IS IMPORTED AND USED:
+   *   Imported and called by src/modules/dealers/dealers.service.js in getLocator().
+   * 5. FINAL OUTPUT OF THE FUNCTION, BEFORE AND AFTER:
+   *   Before: Array of active dealer records matching search filters.
+   *   After: Array of active dealer records matching search filters, filtering out DISTRIBUTOR rows if caller is not authorized for distributor network data.
+   *
+   * @param {object} params — { type, query, excludeDistributor }
+   * @returns {Promise<Array<object>>}
    */
-  async findAllActive({ type, query: searchQuery } = {}) {
+  async findAllActive({ type, query: searchQuery, excludeDistributor = false } = {}) {
     const where = { is_active: true };
     if (type) {
       const normalizedType = type === 'DISTRIBUTOR_HUB' ? 'DISTRIBUTOR' : type;
       where.type = normalizedType;
+    } else if (excludeDistributor) {
+      where.type = { not: 'DISTRIBUTOR' };
     }
     if (searchQuery) {
       where.OR = [

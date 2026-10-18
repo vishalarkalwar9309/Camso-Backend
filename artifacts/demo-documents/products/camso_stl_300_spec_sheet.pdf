@@ -1,0 +1,68 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 982 >>
+stream
+BT
+/F1 16 Tf
+50 720 Td
+(STL 300 Steel Track Technical Specification Sheet) Tj
+ET
+BT
+/F2 10 Tf
+50 680 Td
+14 TL
+(CAMSO TECHNICAL & COMMERCIAL DOCUMENTATION) '
+(------------------------------------------------------------) '
+(Title:        STL 300 Steel Track Technical Specification Sheet) '
+(Document ID:  d_prod_004) '
+(Access Level: PUBLIC) '
+(Doc Type:     TECHNICAL_GUIDE) '
+(Target Role:  GENERAL_PUBLIC) '
+(Product Ref:  STL300-300X52.5X84) '
+(Date Issued:  2026-10-18) '
+(Version:      1.1) '
+() '
+(NOTICE:) '
+(This is a synthetic DEMO test fixture generated for local and) '
+(staging validation of the CAMSO mobile application and business portal.) '
+(Not an official CAMSO engineering document. Specifications are demo values.) '
+() '
+(Summary:) '
+(Engineering specifications, link pitch tolerances, and pin assembly parameters for STL 300 heavy-duty steel tracks.) '
+() '
+(Authorized Access Policy:) '
+(Classification: PUBLIC. Unauthorized redistribution prohibited.) '
+ET
+
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000019 00000 n 
+0000000068 00000 n 
+0000000125 00000 n 
+0000000261 00000 n 
+0000001294 00000 n 
+0000001369 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1439
+%%EOF

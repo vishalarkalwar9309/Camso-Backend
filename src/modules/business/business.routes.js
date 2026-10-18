@@ -1,12 +1,27 @@
 'use strict';
 
 /**
- * business.routes — Protected portal endpoints enforcing role & organization data isolation.
+ * src/modules/business/business.routes.js
  *
- * Rules:
- *   - /api/v1/business/organization       -> Dealer & Distributor (scoped to caller's org)
- *   - /api/v1/business/dealer/portal      -> Dealer ONLY (403 for Distributor)
- *   - /api/v1/business/distributor/portal -> Distributor ONLY (403 for Dealer)
+ * 1. WHAT THIS FILE DOES:
+ *    Defines protected business portal endpoints for authorized commercial personas:
+ *    Dealers, Regional Distributors, and OEM Partners.
+ * 2. OVERALL DESIGN:
+ *    Enforces JWT authentication via businessGuard, applies role-based access control via
+ *    requireBusinessRole middleware, ensures tenant organization isolation, and returns
+ *    deduplicated role-scoped documents and authorized distributor network data.
+ * 3. ELEMENTS IN THE FILE:
+ *    - GET /organization: Returns caller's own organization details and members.
+ *    - GET /dealer/portal: Dealer portal landing metadata.
+ *    - GET /distributor/portal: Distributor portal landing metadata.
+ *    - GET /distributor/network: Authorized regional distributor network directory.
+ *    - GET /oem/portal: OEM partner portal landing metadata.
+ *    - GET /oem/documents: Deduplicated technical guides for OEM partners.
+ *    - GET /dealer/documents: Deduplicated commercial documentation for dealers.
+ *    - GET /distributor/documents: Deduplicated supply chain documentation for distributors.
+ *    - GET /activity: Organization-scoped activity log stream.
+ * 4. FINAL OUTPUT OF THE FILE:
+ *    Express router exporting all /api/v1/business endpoints.
  */
 
 const { Router } = require('express');
@@ -20,6 +35,21 @@ const router = Router();
 
 // Enforce business authentication across all /business routes
 router.use(businessGuard);
+
+/**
+ * GET /api/v1/business/distributor/network
+ * Restricted to DEALER and DISTRIBUTOR personas.
+ * Returns authorized regional distributor network data with server-side RBAC enforcement.
+ */
+router.get('/distributor/network', requireBusinessRole('DEALER', 'DISTRIBUTOR'), async (req, res, next) => {
+  try {
+    const dealersService = require('../dealers/dealers.service');
+    const distributors = await dealersService.getLocator({ type: 'DISTRIBUTOR', ...req.query }, req.principal);
+    sendSuccess(res, distributors, 200);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * GET /api/v1/business/organization
@@ -110,16 +140,26 @@ router.get('/oem/portal', requireBusinessRole('OEM_PARTNER'), async (req, res) =
  * GET /api/v1/business/oem/documents
  * Restricted to OEM_PARTNER persona only.
  * Returns approved technical documents for OEM integration partners.
+ * Supports ?role_only=true to avoid duplicating general public documents.
  */
 router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res, next) => {
   try {
-    const rawDocuments = await prisma.document.findMany({
-      where: {
-        is_published: true,
-        document_type: {
-          in: ['TECHNICAL_GUIDE', 'MANUAL', 'BULLETIN', 'CATALOGUE'],
-        },
+    const isRoleOnly = req.query.role_only === 'true' || req.query.role_specific === 'true';
+    const where = {
+      is_published: true,
+      document_type: {
+        in: ['TECHNICAL_GUIDE', 'MANUAL', 'BULLETIN', 'CATALOGUE'],
       },
+    };
+
+    if (isRoleOnly) {
+      where.access_level = 'OEM';
+    } else {
+      where.access_level = { in: ['PUBLIC', 'OEM'] };
+    }
+
+    const rawDocuments = await prisma.document.findMany({
+      where,
       include: {
         files: {
           select: {
@@ -157,12 +197,18 @@ router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res
       }
     }
 
-    const documents = rawDocuments.map((doc) => {
+    const seenIds = new Set();
+    const documents = [];
+
+    for (const doc of rawDocuments) {
+      if (seenIds.has(doc.id)) continue;
+      seenIds.add(doc.id);
+
       const files = doc.files || [];
       const primaryFile = files.find((f) => f.language_code === 'en') || files[0] || null;
       const media = primaryFile?.media_asset || null;
 
-      return {
+      documents.push({
         id: doc.id,
         title: titleMap[doc.id] || doc.document_type.replace(/_/g, ' '),
         type: doc.document_type,
@@ -186,8 +232,8 @@ router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res
           mime_type: f.media_asset?.mime_type || null,
           filename: f.media_asset?.filename || null,
         })),
-      };
-    });
+      });
+    }
 
     sendSuccess(res, documents, 200);
   } catch (err) {
@@ -199,14 +245,18 @@ router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res
  * GET /api/v1/business/dealer/documents
  * Restricted to DEALER and DISTRIBUTOR personas.
  * Returns dealer commercial and technical documentation (warranty guides, catalogues, bulletins).
+ * Supports ?role_only=true to avoid duplicating public documents already in general library.
  */
 router.get('/dealer/documents', requireBusinessRole('DEALER', 'DISTRIBUTOR'), async (req, res, next) => {
   try {
+    const isRoleOnly = req.query.role_only === 'true' || req.query.role_specific === 'true';
+    const where = {
+      is_published: true,
+      access_level: isRoleOnly ? 'DEALER' : { in: ['PUBLIC', 'DEALER'] },
+    };
+
     const rawDocuments = await prisma.document.findMany({
-      where: {
-        is_published: true,
-        access_level: { in: ['PUBLIC', 'DEALER'] },
-      },
+      where,
       include: {
         files: {
           select: {
@@ -244,12 +294,18 @@ router.get('/dealer/documents', requireBusinessRole('DEALER', 'DISTRIBUTOR'), as
       }
     }
 
-    const documents = rawDocuments.map((doc) => {
+    const seenIds = new Set();
+    const documents = [];
+
+    for (const doc of rawDocuments) {
+      if (seenIds.has(doc.id)) continue;
+      seenIds.add(doc.id);
+
       const files = doc.files || [];
       const primaryFile = files.find((f) => f.language_code === 'en') || files[0] || null;
       const media = primaryFile?.media_asset || null;
 
-      return {
+      documents.push({
         id: doc.id,
         title: titleMap[doc.id] || doc.document_type.replace(/_/g, ' '),
         type: doc.document_type,
@@ -273,8 +329,8 @@ router.get('/dealer/documents', requireBusinessRole('DEALER', 'DISTRIBUTOR'), as
           mime_type: f.media_asset?.mime_type || null,
           filename: f.media_asset?.filename || null,
         })),
-      };
-    });
+      });
+    }
 
     sendSuccess(res, documents, 200);
   } catch (err) {
@@ -286,14 +342,18 @@ router.get('/dealer/documents', requireBusinessRole('DEALER', 'DISTRIBUTOR'), as
  * GET /api/v1/business/distributor/documents
  * Restricted to DISTRIBUTOR persona only.
  * Returns distributor-level regional guidelines, bulk catalogues, and technical bulletins.
+ * Supports ?role_only=true to avoid duplicating public and dealer documents.
  */
 router.get('/distributor/documents', requireBusinessRole('DISTRIBUTOR'), async (req, res, next) => {
   try {
+    const isRoleOnly = req.query.role_only === 'true' || req.query.role_specific === 'true';
+    const where = {
+      is_published: true,
+      access_level: isRoleOnly ? 'DISTRIBUTOR' : { in: ['PUBLIC', 'DEALER', 'DISTRIBUTOR'] },
+    };
+
     const rawDocuments = await prisma.document.findMany({
-      where: {
-        is_published: true,
-        access_level: { in: ['PUBLIC', 'DEALER', 'DISTRIBUTOR'] },
-      },
+      where,
       include: {
         files: {
           select: {
@@ -331,12 +391,18 @@ router.get('/distributor/documents', requireBusinessRole('DISTRIBUTOR'), async (
       }
     }
 
-    const documents = rawDocuments.map((doc) => {
+    const seenIds = new Set();
+    const documents = [];
+
+    for (const doc of rawDocuments) {
+      if (seenIds.has(doc.id)) continue;
+      seenIds.add(doc.id);
+
       const files = doc.files || [];
       const primaryFile = files.find((f) => f.language_code === 'en') || files[0] || null;
       const media = primaryFile?.media_asset || null;
 
-      return {
+      documents.push({
         id: doc.id,
         title: titleMap[doc.id] || doc.document_type.replace(/_/g, ' '),
         type: doc.document_type,
@@ -360,8 +426,8 @@ router.get('/distributor/documents', requireBusinessRole('DISTRIBUTOR'), async (
           mime_type: f.media_asset?.mime_type || null,
           filename: f.media_asset?.filename || null,
         })),
-      };
-    });
+      });
+    }
 
     sendSuccess(res, documents, 200);
   } catch (err) {

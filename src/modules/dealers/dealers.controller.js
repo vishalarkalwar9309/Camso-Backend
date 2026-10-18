@@ -34,8 +34,29 @@ const dealersValidation = require('./dealers.validation');
 
 const dealersController = {
   async locator(req, res) {
-    const { lat, lng, type, radiusKm } = req.query;
-    const dealers = await dealersService.getLocator({ lat, lng, type, radiusKm });
+    const { lat, lng, type, radiusKm, query, q } = req.query;
+
+    let callerPrincipal = req.user || req.businessUser || null;
+    if (!callerPrincipal && req.headers && req.headers.authorization) {
+      const authHeader = req.headers.authorization;
+      if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7).trim();
+        try {
+          const { verifyAccessToken } = require('../../core/utils/tokenService');
+          const decoded = verifyAccessToken(token);
+          if (decoded) {
+            callerPrincipal = {
+              id: decoded.sub || decoded.id,
+              role: decoded.role || (decoded.is_guest ? 'GUEST' : 'END_USER'),
+              is_guest: Boolean(decoded.is_guest),
+              org_id: decoded.org_id || null,
+            };
+          }
+        } catch (_) {}
+      }
+    }
+
+    const dealers = await dealersService.getLocator({ lat, lng, type, radiusKm, query, q }, callerPrincipal);
     return ApiResponse.success(res, dealers);
   },
 

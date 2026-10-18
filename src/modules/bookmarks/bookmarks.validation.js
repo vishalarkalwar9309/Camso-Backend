@@ -5,10 +5,10 @@ const ApiError = require('../../core/utils/ApiError');
 
 const addBookmarkSchema = Joi.object({
   target_type: Joi.string().valid('PRODUCT', 'DOCUMENT', 'TESTIMONIAL').default('PRODUCT'),
-  product_id: Joi.string().trim().optional(),
-  document_id: Joi.string().trim().optional(),
-  testimonial_id: Joi.string().trim().optional(),
-  target_id: Joi.string().trim().optional(),
+  product_id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
+  document_id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
+  testimonial_id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
+  target_id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
   device_id: Joi.string().trim().max(100).optional().messages({
     'string.max': 'device_id cannot exceed 100 characters.',
   }),
@@ -31,11 +31,21 @@ const syncBookmarksSchema = Joi.object({
   device_id: Joi.string().trim().max(100).optional().messages({
     'string.max': 'device_id cannot exceed 100 characters.',
   }),
-  product_ids: Joi.array().items(Joi.string().trim()).optional(),
-  bookmark_ids: Joi.array().items(Joi.string().trim()).optional(),
+  product_ids: Joi.array().items(Joi.alternatives().try(Joi.string().trim(), Joi.number().integer())).optional(),
+  document_ids: Joi.array().items(Joi.alternatives().try(Joi.string().trim(), Joi.number().integer())).optional(),
+  testimonial_ids: Joi.array().items(Joi.alternatives().try(Joi.string().trim(), Joi.number().integer())).optional(),
+  bookmark_ids: Joi.array().items(Joi.alternatives().try(Joi.string().trim(), Joi.number().integer())).optional(),
   items: Joi.array().items(Joi.any()).optional(),
-}).or('guest_token', 'product_ids', 'bookmark_ids', 'device_id').messages({
-  'object.missing': 'guest_token is required to verify the source guest session.',
+  bookmarks: Joi.array().items(Joi.object({
+    id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
+    target_id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
+    product_id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
+    document_id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
+    testimonial_id: Joi.alternatives().try(Joi.string().trim(), Joi.number().integer()).optional(),
+    target_type: Joi.string().valid('PRODUCT', 'DOCUMENT', 'TESTIMONIAL').default('PRODUCT'),
+  })).optional(),
+}).or('guest_token', 'product_ids', 'document_ids', 'testimonial_ids', 'bookmark_ids', 'bookmarks', 'device_id').messages({
+  'object.missing': 'guest_token is required for synchronization.',
 });
 
 const bookmarkIdParamSchema = Joi.object({

@@ -274,18 +274,85 @@ async function syncBookmarks(userPrincipal, payload = {}) {
     throw ApiError.forbidden('Only registered users can synchronize bookmarks.');
   }
 
-  // Support batch syncing product IDs from offline mobile client storage
-  const productIdsToSync = product_ids || bookmark_ids;
-  if (Array.isArray(productIdsToSync) && productIdsToSync.length > 0) {
+  // Support batch syncing polymorphic bookmarks from offline client storage
+  const hasBatchPayload =
+    (Array.isArray(payload.product_ids) && payload.product_ids.length > 0) ||
+    (Array.isArray(payload.document_ids) && payload.document_ids.length > 0) ||
+    (Array.isArray(payload.testimonial_ids) && payload.testimonial_ids.length > 0) ||
+    (Array.isArray(payload.bookmark_ids) && payload.bookmark_ids.length > 0) ||
+    (Array.isArray(payload.bookmarks) && payload.bookmarks.length > 0);
+
+  if (hasBatchPayload) {
     let syncedCount = 0;
-    for (const pid of productIdsToSync) {
-      try {
-        await addBookmark(userPrincipal, { product_id: pid, target_type: 'PRODUCT' });
-        syncedCount++;
-      } catch (err) {
-        // Ignore duplicate conflict (already bookmarked) or inactive product errors during batch sync
+
+    // 1. Explicit product_ids
+    if (Array.isArray(payload.product_ids)) {
+      for (const pid of payload.product_ids) {
+        try {
+          await addBookmark(userPrincipal, { product_id: pid, target_type: 'PRODUCT' });
+          syncedCount++;
+        } catch (_) {}
       }
     }
+
+    // 2. Explicit document_ids
+    if (Array.isArray(payload.document_ids)) {
+      for (const did of payload.document_ids) {
+        try {
+          await addBookmark(userPrincipal, { document_id: did, target_type: 'DOCUMENT' });
+          syncedCount++;
+        } catch (_) {}
+      }
+    }
+
+    // 3. Explicit testimonial_ids
+    if (Array.isArray(payload.testimonial_ids)) {
+      for (const tid of payload.testimonial_ids) {
+        try {
+          await addBookmark(userPrincipal, { testimonial_id: tid, target_type: 'TESTIMONIAL' });
+          syncedCount++;
+        } catch (_) {}
+      }
+    }
+
+    // 4. Structured bookmarks array
+    if (Array.isArray(payload.bookmarks)) {
+      for (const b of payload.bookmarks) {
+        try {
+          await addBookmark(userPrincipal, b);
+          syncedCount++;
+        } catch (_) {}
+      }
+    }
+
+    // 5. Generic bookmark_ids (auto-detect target entity)
+    if (Array.isArray(payload.bookmark_ids)) {
+      for (const id of payload.bookmark_ids) {
+        try {
+          const prod = await repo.findProductById(id);
+          if (prod) {
+            await addBookmark(userPrincipal, { product_id: id, target_type: 'PRODUCT' });
+            syncedCount++;
+            continue;
+          }
+          const doc = await repo.findDocumentById(id);
+          if (doc) {
+            await addBookmark(userPrincipal, { document_id: id, target_type: 'DOCUMENT' });
+            syncedCount++;
+            continue;
+          }
+          const testm = await repo.findTestimonialById(id);
+          if (testm) {
+            await addBookmark(userPrincipal, { testimonial_id: id, target_type: 'TESTIMONIAL' });
+            syncedCount++;
+            continue;
+          }
+          await addBookmark(userPrincipal, { product_id: id, target_type: 'PRODUCT' });
+          syncedCount++;
+        } catch (_) {}
+      }
+    }
+
     return {
       synced_count: syncedCount,
       removed_duplicates: 0,

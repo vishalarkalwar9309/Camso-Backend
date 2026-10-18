@@ -66,25 +66,44 @@ const dealersService = {
    * getLocator
    * Retrieves active dealers within a given radius using Haversine calculation.
    */
-  async getLocator({ lat, lng, type, radiusKm, query, q }) {
+  async getLocator({ lat, lng, type, radiusKm, query, q }, callerPrincipal = null) {
+    const isAuthorizedForDistributor =
+      callerPrincipal &&
+      ['DEALER', 'DISTRIBUTOR', 'ADMIN', 'SUPER_ADMIN', 'CONTENT_ADMIN'].includes(callerPrincipal.role);
+
+    const normalizedType = type === 'DISTRIBUTOR_HUB' ? 'DISTRIBUTOR' : type;
+
+    // Enforce server-side authorization for distributor network
+    if (normalizedType === 'DISTRIBUTOR') {
+      if (!isAuthorizedForDistributor) {
+        if (!callerPrincipal || callerPrincipal.is_guest) {
+          throw ApiError.unauthorized('Authentication required to access distributor network data.');
+        }
+        throw ApiError.forbidden('Access denied to distributor network data.');
+      }
+    }
+
     const searchQuery = query || q;
+    const shouldExcludeDistributor = !isAuthorizedForDistributor && !normalizedType;
     let dealers;
+
     if (lat !== undefined && lng !== undefined && lat !== null && lng !== null && String(lat).trim() !== '' && String(lng).trim() !== '') {
       const nLat = parseFloat(lat);
       const nLng = parseFloat(lng);
       const nRad = parseFloat(radiusKm || 1000);
-      const normalizedType = type === 'DISTRIBUTOR_HUB' ? 'DISTRIBUTOR' : type;
 
       dealers = await dealersRepository.findNearest({
         lat: nLat,
         lng: nLng,
         type: normalizedType,
         radiusKm: nRad,
+        excludeDistributor: shouldExcludeDistributor,
       });
     } else {
       dealers = await dealersRepository.findAllActive({
-        type,
+        type: normalizedType,
         query: searchQuery,
+        excludeDistributor: shouldExcludeDistributor,
       });
     }
 

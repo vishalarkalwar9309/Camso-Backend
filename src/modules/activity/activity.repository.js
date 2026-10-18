@@ -186,7 +186,12 @@ async function countUserActivities({ userId, deviceId, activityType }) {
 async function findBusinessActivities({ businessUserId, organizationId, activityType, skip = 0, take = 20 }) {
   const where = {};
 
-  if (businessUserId) {
+  if (businessUserId && organizationId) {
+    where.OR = [
+      { business_user_id: businessUserId },
+      { organization_id: organizationId },
+    ];
+  } else if (businessUserId) {
     where.business_user_id = businessUserId;
   } else if (organizationId) {
     where.organization_id = organizationId;
@@ -234,7 +239,12 @@ async function findBusinessActivities({ businessUserId, organizationId, activity
 async function countBusinessActivities({ businessUserId, organizationId, activityType }) {
   const where = {};
 
-  if (businessUserId) {
+  if (businessUserId && organizationId) {
+    where.OR = [
+      { business_user_id: businessUserId },
+      { organization_id: organizationId },
+    ];
+  } else if (businessUserId) {
     where.business_user_id = businessUserId;
   } else if (organizationId) {
     where.organization_id = organizationId;
