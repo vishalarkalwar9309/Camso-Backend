@@ -63,6 +63,7 @@ async function addBookmark(userPrincipal, payload) {
 
   // 2. Resolve ownership
   let userId = null;
+  let businessUserId = null;
   let resolvedDeviceId = null;
 
   if (userPrincipal.is_guest) {
@@ -74,6 +75,8 @@ async function addBookmark(userPrincipal, payload) {
       throw ApiError.badRequest('device_id does not match the authenticated guest session.');
     }
     resolvedDeviceId = linkedDevice;
+  } else if (userPrincipal.is_business || ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'].includes(userPrincipal.role)) {
+    businessUserId = userPrincipal.id;
   } else {
     // Authenticated registered user — strictly derive identity from verified token
     userId = userPrincipal.id;
@@ -86,6 +89,9 @@ async function addBookmark(userPrincipal, payload) {
       deviceId: resolvedDeviceId,
       productId: resolvedProductId,
     };
+    if (businessUserId) {
+      createParams.businessUserId = businessUserId;
+    }
     if (resolvedTargetType !== 'PRODUCT' || resolvedDocumentId || resolvedTestimonialId) {
       createParams.targetType = resolvedTargetType;
       createParams.documentId = resolvedDocumentId;
@@ -242,12 +248,49 @@ async function removeBookmark(userPrincipal, { identifier, device_id }) {
 }
 
 /**
- * Synchronize guest bookmarks into an authenticated user account.
- * Requires cryptographic proof of the source guest session via verified JWT.
+ * Synchronize guest or offline bookmarks into an authenticated user or business account.
+ *
+ * 1. The use of function:
+ *    Migrates offline/guest saved bookmarks into the caller's persistent account.
+ * 2. How does the specific function work:
+ *    - If product_ids or bookmark_ids array is provided, batch-creates bookmarks for the authenticated caller.
+ *    - If guest_token is provided, cryptographically verifies guest session and migrates guest device bookmarks.
+ *    - Returns count of synced bookmarks.
+ * 3. Concepts used in the function:
+ *    Batch synchronization, cryptographic credential handoff, idempotent migration.
+ * 4. Places where this function is imported and used:
+ *    Imported and used in src/modules/bookmarks/bookmarks.controller.js.
+ * 5. Final output of the function, before and after:
+ *    Before: Unsynced guest token or list of product IDs in request payload.
+ *    After: { synced_count: number, removed_duplicates: number, message: string }.
+ *
+ * @param {object} userPrincipal
+ * @param {object} payload
+ * @returns {Promise<{ synced_count: number, removed_duplicates: number, message: string }>}
  */
-async function syncBookmarks(userPrincipal, { guest_token, device_id }) {
+async function syncBookmarks(userPrincipal, payload = {}) {
+  const { guest_token, device_id, product_ids, bookmark_ids } = payload;
   if (userPrincipal.is_guest) {
     throw ApiError.forbidden('Only registered users can synchronize bookmarks.');
+  }
+
+  // Support batch syncing product IDs from offline mobile client storage
+  const productIdsToSync = product_ids || bookmark_ids;
+  if (Array.isArray(productIdsToSync) && productIdsToSync.length > 0) {
+    let syncedCount = 0;
+    for (const pid of productIdsToSync) {
+      try {
+        await addBookmark(userPrincipal, { product_id: pid, target_type: 'PRODUCT' });
+        syncedCount++;
+      } catch (err) {
+        // Ignore duplicate conflict (already bookmarked) or inactive product errors during batch sync
+      }
+    }
+    return {
+      synced_count: syncedCount,
+      removed_duplicates: 0,
+      message: 'Bookmarks synchronized successfully.',
+    };
   }
 
   if (!guest_token) {

@@ -360,22 +360,25 @@ enum BookmarkTargetType {
 // --------
 // Stores saved/bookmarked items (products, documents, testimonials) for authenticated users and guest devices.
 model Bookmark {
-  id             String             @id @default(cuid())
-  user_id        String?
-  device_id      String?
-  target_type    BookmarkTargetType @default(PRODUCT)
-  product_id     String?
-  document_id    String?
-  testimonial_id String?
-  created_at     DateTime           @default(now())
+  id               String             @id @default(cuid())
+  user_id          String?
+  business_user_id String?
+  device_id        String?
+  target_type      BookmarkTargetType @default(PRODUCT)
+  product_id       String?
+  document_id      String?
+  testimonial_id   String?
+  created_at       DateTime           @default(now())
 
   // Relations
-  user        User?        @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  product     Product?     @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  document    Document?    @relation(fields: [document_id], references: [id], onDelete: Cascade)
-  testimonial Testimonial? @relation(fields: [testimonial_id], references: [id], onDelete: Cascade)
+  user          User?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  business_user BusinessUser? @relation(fields: [business_user_id], references: [id], onDelete: Cascade)
+  product       Product?      @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  document      Document?     @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  testimonial   Testimonial?  @relation(fields: [testimonial_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
+  @@index([business_user_id])
   @@index([device_id])
   @@index([product_id])
   @@index([document_id])
@@ -499,8 +502,9 @@ model BusinessOrganization {
   created_at      DateTime       @default(now())
   updated_at      DateTime       @updatedAt
 
-  members    BusinessUser[]
-  activities UserActivity[]
+  members      BusinessUser[]
+  activities   UserActivity[]
+  calculations UserCalculation[]
 
   @@index([type, approval_status])
   @@map("business_organizations")
@@ -522,6 +526,8 @@ model BusinessUser {
   organization   BusinessOrganization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   refresh_tokens BusinessRefreshToken[]
   activities     UserActivity[]
+  bookmarks      Bookmark[]
+  calculations   UserCalculation[]
 
   @@index([organization_id])
   @@index([role, status])
@@ -841,6 +847,8 @@ model UserActivity {
 model UserCalculation {
   id               String   @id @default(cuid())
   user_id          String?
+  business_user_id String?
+  organization_id  String?
   device_id        String?
   calculation_type String   @db.VarChar(100)
   title            String?  @db.VarChar(255)
@@ -850,9 +858,13 @@ model UserCalculation {
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
-  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user          User?                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  business_user BusinessUser?         @relation(fields: [business_user_id], references: [id], onDelete: Cascade)
+  organization  BusinessOrganization? @relation(fields: [organization_id], references: [id], onDelete: SetNull)
 
   @@index([user_id, created_at])
+  @@index([business_user_id, created_at])
+  @@index([organization_id, created_at])
   @@index([device_id, created_at])
   @@index([calculation_type])
   @@map("user_calculations")

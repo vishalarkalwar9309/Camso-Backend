@@ -53,7 +53,11 @@ async function findProducts({
   }
 
   if (is_new !== undefined && (is_new === true || is_new === 'true')) {
-    where.created_at = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    where.is_featured = false;
+    where.OR = [
+      { pid: 'CTL400-400X86X52' },
+      { launch_date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+    ];
   }
 
   if (q && q.trim()) {

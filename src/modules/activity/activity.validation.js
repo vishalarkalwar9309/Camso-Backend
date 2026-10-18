@@ -87,7 +87,14 @@ function validate(schema, source = 'body') {
       return next(ApiError.badRequest('Validation failed.', details));
     }
 
-    req[source] = value;
+    if (source === 'query' && req.query && typeof req.query === 'object') {
+      for (const k of Object.keys(req.query)) {
+        delete req.query[k];
+      }
+      Object.assign(req.query, value);
+    } else {
+      req[source] = value;
+    }
     next();
   };
 }

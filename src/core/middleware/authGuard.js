@@ -54,18 +54,40 @@ function authGuard(req, res, next) {
     const decoded = verifyAccessToken(token);
 
     const userRole = decoded.role || (decoded.is_guest ? 'GUEST' : 'END_USER');
+    const isBusiness = ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'].includes(userRole);
+    const orgId = decoded.org_id || decoded.organization_id || null;
+
     req.user = {
       id: decoded.sub,
-      is_guest: decoded.is_guest,
+      email: decoded.email || null,
+      is_guest: Boolean(decoded.is_guest),
       role: userRole,
+      is_business: isBusiness,
+      org_id: orgId,
+      organization_id: orgId,
+      business_user_id: isBusiness ? decoded.sub : null,
     };
     req.principal = {
       id: decoded.id !== undefined ? decoded.id : decoded.sub,
-      type: decoded.type || (decoded.is_guest ? 'GUEST' : (decoded.role === 'CUSTOMER' ? 'END_USER' : 'END_USER')),
+      type: decoded.type || (decoded.is_guest ? 'GUEST' : userRole),
       role: userRole,
-      is_guest: decoded.is_guest,
+      is_guest: Boolean(decoded.is_guest),
       deviceId: decoded.deviceId || req.headers['x-device-id'] || 'unknown_device',
+      is_business: isBusiness,
+      org_id: orgId,
+      organization_id: orgId,
+      business_user_id: isBusiness ? decoded.sub : null,
     };
+
+    if (isBusiness) {
+      req.businessUser = {
+        id: decoded.sub,
+        email: decoded.email || null,
+        role: userRole,
+        organization_id: orgId,
+        org_id: orgId,
+      };
+    }
 
     next();
   } catch (err) {

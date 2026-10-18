@@ -62,12 +62,114 @@ function generateAccessToken({ sub, is_guest, role }) {
 /**
  * Verify and decode an access JWT.
  *
+ * 1. The use of function:
+ *    Validates the authenticity and expiration of incoming access tokens.
+ * 2. How does the specific function work:
+ *    In non-production environments, intercepts offline demo tokens (prefixed with 'demo_mode_')
+ *    and synthesizes verified actor claims matching the mobile client's demo personas.
+ *    Otherwise, verifies standard cryptographic HMAC-SHA256 signatures via jsonwebtoken library.
+ * 3. Concepts used in the function:
+ *    Cryptographic token verification, offline mock claims reconciliation, development persona decoding.
+ * 4. Places where this function is imported and used:
+ *    Used in authGuard, businessGuard, adminGuard, documents.controller, and bookmarks.service.
+ * 5. Final output of the function, before and after:
+ *    Before: Encoded JWT string or demo token identifier.
+ *    After: Decoded claims payload object { sub, email, role, org_id, is_guest }, or thrown TokenExpiredError/JsonWebTokenError.
+ *
  * @param {string} token
  * @returns {object} decoded payload
  * @throws {jwt.TokenExpiredError} if token is expired
  * @throws {jwt.JsonWebTokenError} if token is invalid
  */
 function verifyAccessToken(token) {
+  if (typeof token === 'string' && token.startsWith('demo_mode_') && process.env.NODE_ENV !== 'production') {
+    const rawRole = token.replace(/^demo_mode_/, '').replace(/_token$/, '');
+    const normalizedRole = rawRole.toLowerCase();
+
+    if (normalizedRole === 'dealer') {
+      return {
+        sub: 'demo_dealer_user',
+        id: 'demo_dealer_user',
+        email: 'demo.dealer@camso.local',
+        role: 'DEALER',
+        org_id: 'org_dealer_demo',
+        organization_id: 'org_dealer_demo',
+        type: 'DEALER',
+        is_guest: false,
+      };
+    }
+    if (normalizedRole === 'distributor') {
+      return {
+        sub: 'demo_distributor_user',
+        id: 'demo_distributor_user',
+        email: 'demo.distributor@camso.local',
+        role: 'DISTRIBUTOR',
+        org_id: 'org_distrib_demo',
+        organization_id: 'org_distrib_demo',
+        type: 'DISTRIBUTOR',
+        is_guest: false,
+      };
+    }
+    if (normalizedRole === 'oem_partner' || normalizedRole === 'oempartner' || normalizedRole === 'oem') {
+      return {
+        sub: 'demo_oem_user',
+        id: 'demo_oem_user',
+        email: 'demo.oem@camso.local',
+        role: 'OEM_PARTNER',
+        org_id: 'org_oem_demo',
+        organization_id: 'org_oem_demo',
+        type: 'OEM_PARTNER',
+        is_guest: false,
+      };
+    }
+    if (normalizedRole === 'admin' || normalizedRole === 'super_admin') {
+      return {
+        sub: 'demo_admin_user',
+        id: 'demo_admin_user',
+        email: 'demo.admin@camso.local',
+        role: 'SUPER_ADMIN',
+        type: 'ADMIN',
+        is_guest: false,
+      };
+    }
+    if (normalizedRole === 'customer' || normalizedRole === 'end_user') {
+      return {
+        sub: 'demo_customer_user',
+        id: 'demo_customer_user',
+        email: 'demo.customer@camso.local',
+        role: 'END_USER',
+        type: 'END_USER',
+        is_guest: false,
+      };
+    }
+    if (normalizedRole === 'employee') {
+      return {
+        sub: 'demo_employee_user',
+        id: 'demo_employee_user',
+        email: 'employee@ceat.com',
+        role: 'END_USER',
+        type: 'EMPLOYEE',
+        is_guest: false,
+      };
+    }
+    if (normalizedRole === 'guest') {
+      return {
+        sub: 'demo_guest_user',
+        id: 'demo_guest_user',
+        role: 'GUEST',
+        type: 'GUEST',
+        is_guest: true,
+      };
+    }
+
+    return {
+      sub: `demo_${rawRole}_user`,
+      id: `demo_${rawRole}_user`,
+      role: rawRole.toUpperCase(),
+      is_guest: false,
+    };
+  }
+
   return jwt.verify(token, jwtConfig.accessSecret);
 }
 

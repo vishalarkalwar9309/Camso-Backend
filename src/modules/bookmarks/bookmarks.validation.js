@@ -25,13 +25,17 @@ const listBookmarksSchema = Joi.object({
 });
 
 const syncBookmarksSchema = Joi.object({
-  guest_token: Joi.string().required().trim().messages({
-    'any.required': 'guest_token is required to verify the source guest session.',
+  guest_token: Joi.string().trim().optional().messages({
     'string.empty': 'guest_token cannot be empty.',
   }),
   device_id: Joi.string().trim().max(100).optional().messages({
     'string.max': 'device_id cannot exceed 100 characters.',
   }),
+  product_ids: Joi.array().items(Joi.string().trim()).optional(),
+  bookmark_ids: Joi.array().items(Joi.string().trim()).optional(),
+  items: Joi.array().items(Joi.any()).optional(),
+}).or('guest_token', 'product_ids', 'bookmark_ids', 'device_id').messages({
+  'object.missing': 'guest_token is required to verify the source guest session.',
 });
 
 const bookmarkIdParamSchema = Joi.object({

@@ -77,7 +77,10 @@ async function findUserActivities({ userId, deviceId, activityType, skip = 0, ta
   const where = {};
 
   if (userId) {
-    where.user_id = userId;
+    where.OR = [
+      { user_id: userId },
+      { business_user_id: userId },
+    ];
   } else if (deviceId) {
     where.device_id = deviceId;
   } else {
@@ -97,6 +100,14 @@ async function findUserActivities({ userId, deviceId, activityType, skip = 0, ta
     });
   } catch (err) {
     if (err.code === 'P2021' || err.code === 'P2022') {
+      if (userId) {
+        return prisma.userActivity.findMany({
+          where: { user_id: userId, ...(activityType ? { activity_type: activityType } : {}) },
+          orderBy: { created_at: 'desc' },
+          skip,
+          take,
+        }).catch(() => []);
+      }
       return [];
     }
     throw err;
@@ -109,7 +120,7 @@ async function findUserActivities({ userId, deviceId, activityType, skip = 0, ta
  * 1. The use of function:
  *    Supplies total count for pagination metadata calculation in user activity lists.
  * 2. How does the specific function work:
- *    Executes prisma.userActivity.count with identical where conditions as findUserActivities.
+ *    Executes prisma.userActivity.count matching user_id OR business_user_id.
  * 3. Concepts used in the function:
  *    Prisma count aggregation, database indexing.
  * 4. Places where this function is imported and used:
@@ -125,7 +136,10 @@ async function countUserActivities({ userId, deviceId, activityType }) {
   const where = {};
 
   if (userId) {
-    where.user_id = userId;
+    where.OR = [
+      { user_id: userId },
+      { business_user_id: userId },
+    ];
   } else if (deviceId) {
     where.device_id = deviceId;
   } else {
@@ -140,6 +154,11 @@ async function countUserActivities({ userId, deviceId, activityType }) {
     return await prisma.userActivity.count({ where });
   } catch (err) {
     if (err.code === 'P2021' || err.code === 'P2022') {
+      if (userId) {
+        return prisma.userActivity.count({
+          where: { user_id: userId, ...(activityType ? { activity_type: activityType } : {}) },
+        }).catch(() => 0);
+      }
       return 0;
     }
     throw err;

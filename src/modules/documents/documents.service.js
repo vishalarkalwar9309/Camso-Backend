@@ -134,11 +134,13 @@ const documentsService = {
       const files = doc.files || [];
       const primaryFile = files.find((f) => f.language_code === reqLang) || files[0] || null;
       const media = primaryFile?.media_asset || null;
+      const hasDbAccessLevel = Boolean(doc.access_level);
       const accessLevel = resolveDocumentAccessLevel(doc);
 
       return {
         ...doc,
         access_level: accessLevel,
+        has_db_access_level: hasDbAccessLevel,
         has_file: Boolean(media && (media.url || media.storage_path)),
         file_size_bytes: media?.size_bytes || null,
         mime_type: media?.mime_type || null,
@@ -156,10 +158,16 @@ const documentsService = {
       };
     });
 
-    // FAIL-CLOSED: Public browse must strictly return ONLY documents whose resolved access level is PUBLIC
-    const publicDocuments = documents.filter((doc) => doc.access_level === 'PUBLIC');
+    // Show all published documents to mobile users except admin-only documents (Issue 14).
+    // On unmigrated schemas lacking access_level, fail closed strictly to PUBLIC.
+    const visibleDocuments = documents.filter((doc) => {
+      if (!doc.has_db_access_level && doc.access_level !== 'PUBLIC') {
+        return false;
+      }
+      return doc.access_level !== 'ADMIN';
+    });
 
-    return { documents: publicDocuments, pagination: meta };
+    return { documents: visibleDocuments, pagination: meta };
   },
 
   /**
@@ -477,6 +485,9 @@ const documentsService = {
     if (media.url && (media.url.startsWith('supabase://') || media.url.startsWith('documents/'))) {
       const { createSignedDownloadUrl } = require('../../core/utils/supabaseStorage');
       downloadUrl = await createSignedDownloadUrl(media.url, 3600);
+    } else if (downloadUrl && downloadUrl.startsWith('/')) {
+      const baseUrl = req ? `${req.protocol}://${req.get('host')}` : (process.env.APP_BASE_URL || 'http://localhost:4000');
+      downloadUrl = `${baseUrl}${downloadUrl}`;
     }
 
     return {

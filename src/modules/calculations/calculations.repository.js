@@ -38,21 +38,31 @@ const { prisma } = require('../../config/database');
  * @returns {Promise<object>} The created calculation record.
  */
 async function createCalculation(data) {
-  return prisma.userCalculation.create({
-    data,
-  });
+  try {
+    return await prisma.userCalculation.create({
+      data,
+    });
+  } catch (err) {
+    if ((err.code === 'P2021' || err.code === 'P2022') && (data.business_user_id || data.organization_id)) {
+      const fallback = { ...data };
+      delete fallback.business_user_id;
+      delete fallback.organization_id;
+      return prisma.userCalculation.create({ data: fallback });
+    }
+    throw err;
+  }
 }
 
 /**
  * Retrieves a paginated list of saved calculations for an owner.
  *
  * 1. The use of function:
- *    Queries calculations belonging to an authenticated user or guest device.
+ *    Queries calculations belonging to an authenticated user, business user, or guest device.
  * 2. How does the specific function work:
- *    Constructs a Prisma where condition ensuring records belong to userId or deviceId,
- *    and optionally filters by calculationType.
+ *    Constructs a Prisma where condition ensuring records belong to userId (as user_id or business_user_id)
+ *    or deviceId, and optionally filters by calculationType.
  * 3. Concepts used in the function:
- *    Pagination, owner scoping, database index query.
+ *    Pagination, owner scoping, database index query, unmigrated schema resilience.
  * 4. Places where this function is imported and used:
  *    Imported in src/modules/calculations/calculations.service.js.
  * 5. Final output of the function, before and after:
@@ -66,7 +76,10 @@ async function findCalculations({ userId, deviceId, calculationType, skip = 0, t
   const where = {};
 
   if (userId) {
-    where.user_id = userId;
+    where.OR = [
+      { user_id: userId },
+      { business_user_id: userId },
+    ];
   } else if (deviceId) {
     where.device_id = deviceId;
   } else {
@@ -77,12 +90,27 @@ async function findCalculations({ userId, deviceId, calculationType, skip = 0, t
     where.calculation_type = calculationType;
   }
 
-  return prisma.userCalculation.findMany({
-    where,
-    orderBy: { created_at: 'desc' },
-    skip,
-    take,
-  });
+  try {
+    return await prisma.userCalculation.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      skip,
+      take,
+    });
+  } catch (err) {
+    if (err.code === 'P2021' || err.code === 'P2022') {
+      if (userId) {
+        return prisma.userCalculation.findMany({
+          where: { user_id: userId, ...(calculationType ? { calculation_type: calculationType } : {}) },
+          orderBy: { created_at: 'desc' },
+          skip,
+          take,
+        }).catch(() => []);
+      }
+      return [];
+    }
+    throw err;
+  }
 }
 
 /**
@@ -91,7 +119,7 @@ async function findCalculations({ userId, deviceId, calculationType, skip = 0, t
  * 1. The use of function:
  *    Computes total records for calculation pagination metadata.
  * 2. How does the specific function work:
- *    Executes prisma.userCalculation.count matching owner where condition.
+ *    Executes prisma.userCalculation.count matching owner where condition (user_id OR business_user_id).
  * 3. Concepts used in the function:
  *    Prisma count aggregation.
  * 4. Places where this function is imported and used:
@@ -107,7 +135,10 @@ async function countCalculations({ userId, deviceId, calculationType }) {
   const where = {};
 
   if (userId) {
-    where.user_id = userId;
+    where.OR = [
+      { user_id: userId },
+      { business_user_id: userId },
+    ];
   } else if (deviceId) {
     where.device_id = deviceId;
   } else {
@@ -118,7 +149,19 @@ async function countCalculations({ userId, deviceId, calculationType }) {
     where.calculation_type = calculationType;
   }
 
-  return prisma.userCalculation.count({ where });
+  try {
+    return await prisma.userCalculation.count({ where });
+  } catch (err) {
+    if (err.code === 'P2021' || err.code === 'P2022') {
+      if (userId) {
+        return prisma.userCalculation.count({
+          where: { user_id: userId, ...(calculationType ? { calculation_type: calculationType } : {}) },
+        }).catch(() => 0);
+      }
+      return 0;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -127,7 +170,7 @@ async function countCalculations({ userId, deviceId, calculationType }) {
  * 1. The use of function:
  *    Fetches detailed calculation results for a specific saved entry.
  * 2. How does the specific function work:
- *    Finds first record matching id and caller's user_id or device_id.
+ *    Finds first record matching id and caller's user_id, business_user_id, or device_id.
  * 3. Concepts used in the function:
  *    Secure ID lookup with ownership verification.
  * 4. Places where this function is imported and used:
@@ -143,16 +186,31 @@ async function findCalculationById({ id, userId, deviceId }) {
   const where = { id };
 
   if (userId) {
-    where.user_id = userId;
+    where.OR = [
+      { user_id: userId },
+      { business_user_id: userId },
+    ];
   } else if (deviceId) {
     where.device_id = deviceId;
   } else {
     return null;
   }
 
-  return prisma.userCalculation.findFirst({
-    where,
-  });
+  try {
+    return await prisma.userCalculation.findFirst({
+      where,
+    });
+  } catch (err) {
+    if (err.code === 'P2021' || err.code === 'P2022') {
+      if (userId) {
+        return prisma.userCalculation.findFirst({
+          where: { id, user_id: userId },
+        }).catch(() => null);
+      }
+      return null;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -177,16 +235,31 @@ async function deleteCalculation({ id, userId, deviceId }) {
   const where = { id };
 
   if (userId) {
-    where.user_id = userId;
+    where.OR = [
+      { user_id: userId },
+      { business_user_id: userId },
+    ];
   } else if (deviceId) {
     where.device_id = deviceId;
   } else {
     return { count: 0 };
   }
 
-  return prisma.userCalculation.deleteMany({
-    where,
-  });
+  try {
+    return await prisma.userCalculation.deleteMany({
+      where,
+    });
+  } catch (err) {
+    if (err.code === 'P2021' || err.code === 'P2022') {
+      if (userId) {
+        return prisma.userCalculation.deleteMany({
+          where: { id, user_id: userId },
+        }).catch(() => ({ count: 0 }));
+      }
+      return { count: 0 };
+    }
+    throw err;
+  }
 }
 
 module.exports = {

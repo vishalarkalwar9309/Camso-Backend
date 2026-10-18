@@ -62,8 +62,24 @@ async function findDeviceForUser(userId) {
 
 /**
  * Create a new bookmark (polymorphic: product, document, or testimonial).
+ *
+ * 1. The use of function:
+ *    Inserts a bookmark record scoped to a user, business user, or guest device.
+ * 2. How does the specific function work:
+ *    Populates data object including target IDs and user/business identity.
+ *    Catches P2022 on unmigrated schemas to gracefully omit business_user_id if not present in DB.
+ * 3. Concepts used in the function:
+ *    Polymorphism, multi-tenant scoping, schema fallback resilience.
+ * 4. Places where this function is imported and used:
+ *    Imported and used in src/modules/bookmarks/bookmarks.service.js.
+ * 5. Final output of the function, before and after:
+ *    Before: Bookmark creation parameters { userId, businessUserId, deviceId, productId, targetType, documentId, testimonialId }.
+ *    After: Created Bookmark record with populated relational entities.
+ *
+ * @param {object} params
+ * @returns {Promise<object>}
  */
-async function createBookmark({ userId, deviceId, productId, targetType = 'PRODUCT', documentId, testimonialId }) {
+async function createBookmark({ userId, businessUserId, deviceId, productId, targetType = 'PRODUCT', documentId, testimonialId }) {
   const data = {
     user_id: userId || null,
     device_id: deviceId || null,
@@ -72,131 +88,234 @@ async function createBookmark({ userId, deviceId, productId, targetType = 'PRODU
     document_id: documentId || null,
     testimonial_id: testimonialId || null,
   };
+  if (businessUserId) {
+    data.business_user_id = businessUserId;
+  }
 
-  return prisma.bookmark.create({
-    data,
-    include: {
-      product: {
-        include: {
-          category: {
-            select: { id: true, name: true, slug: true },
-          },
-          images: {
-            where: { is_primary: true },
-            take: 1,
-          },
+  const include = {
+    product: {
+      include: {
+        category: {
+          select: { id: true, name: true, slug: true },
+        },
+        images: {
+          where: { is_primary: true },
+          take: 1,
         },
       },
-      document: {
-        include: {
-          files: {
-            take: 1,
-            include: {
-              media_asset: {
-                select: { id: true, url: true, filename: true, mime_type: true, size_bytes: true },
-              },
+    },
+    document: {
+      include: {
+        files: {
+          take: 1,
+          include: {
+            media_asset: {
+              select: { id: true, url: true, filename: true, mime_type: true, size_bytes: true },
             },
           },
         },
       },
-      testimonial: {
-        select: { id: true, customer_name: true, region: true, story_type: true },
-      },
     },
-  });
+    testimonial: {
+      select: { id: true, customer_name: true, region: true, story_type: true },
+    },
+  };
+
+  try {
+    return await prisma.bookmark.create({
+      data,
+      include,
+    });
+  } catch (err) {
+    if (err.code === 'P2022' && data.business_user_id) {
+      delete data.business_user_id;
+      return prisma.bookmark.create({ data, include });
+    }
+    throw err;
+  }
 }
 
 /**
- * Find paginated bookmarks for a user or guest device.
+ * Find paginated bookmarks for a user, business user, or guest device.
+ *
+ * 1. The use of function:
+ *    Retrieves bookmarked items for authenticated or guest sessions.
+ * 2. How does the specific function work:
+ *    Queries bookmarks matching user_id OR business_user_id (for authenticated users)
+ *    or device_id (for guests), ordered by created_at desc with pagination.
+ * 3. Concepts used in the function:
+ *    Multi-role scoping, pagination, relational eager loading.
+ * 4. Places where this function is imported and used:
+ *    Imported and used in src/modules/bookmarks/bookmarks.service.js.
+ * 5. Final output of the function, before and after:
+ *    Before: Query parameters { userId, deviceId, skip, take, sort, targetType }.
+ *    After: { items: Array<object>, total: number }.
+ *
+ * @param {object} params
+ * @returns {Promise<{ items: Array<object>, total: number }>}
  */
 async function findBookmarks({ userId, deviceId, skip = 0, take = 20, sort = 'desc', targetType }) {
   if (!userId && !deviceId) {
     return { items: [], total: 0 };
   }
 
-  const where = {
-    ...(userId ? { user_id: userId } : { device_id: deviceId }),
-  };
+  const where = {};
+  if (userId) {
+    where.OR = [
+      { user_id: userId },
+      { business_user_id: userId },
+    ];
+  } else if (deviceId) {
+    where.device_id = deviceId;
+  }
 
   if (targetType && targetType !== 'ALL') {
     where.target_type = targetType;
   }
 
-  const [items, total] = await Promise.all([
-    prisma.bookmark.findMany({
-      where,
-      skip,
-      take,
-      orderBy: { created_at: sort },
+  const include = {
+    product: {
       include: {
-        product: {
-          include: {
-            category: {
-              select: { id: true, name: true, slug: true },
-            },
-            images: {
-              orderBy: [{ is_primary: 'desc' }, { sort_order: 'asc' }],
-              take: 3,
-            },
-            specifications: {
-              where: { is_filterable: true },
-              orderBy: { sort_order: 'asc' },
-              take: 5,
-            },
-          },
+        category: {
+          select: { id: true, name: true, slug: true },
         },
-        document: {
-          include: {
-            files: {
-              take: 1,
-              include: {
-                media_asset: {
-                  select: { id: true, url: true, filename: true, mime_type: true, size_bytes: true },
-                },
-              },
-            },
-          },
+        images: {
+          orderBy: [{ is_primary: 'desc' }, { sort_order: 'asc' }],
+          take: 3,
         },
-        testimonial: {
-          select: { id: true, customer_name: true, region: true, story_type: true },
+        specifications: {
+          where: { is_filterable: true },
+          orderBy: { sort_order: 'asc' },
+          take: 5,
         },
       },
-    }),
-    prisma.bookmark.count({ where }),
-  ]);
+    },
+    document: {
+      include: {
+        files: {
+          take: 1,
+          include: {
+            media_asset: {
+              select: { id: true, url: true, filename: true, mime_type: true, size_bytes: true },
+            },
+          },
+        },
+      },
+    },
+    testimonial: {
+      select: { id: true, customer_name: true, region: true, story_type: true },
+    },
+  };
 
-  return { items, total };
+  try {
+    const [items, total] = await Promise.all([
+      prisma.bookmark.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { created_at: sort },
+        include,
+      }),
+      prisma.bookmark.count({ where }),
+    ]);
+    return { items, total };
+  } catch (err) {
+    if (err.code === 'P2022' && userId) {
+      const fallbackWhere = { user_id: userId };
+      if (targetType && targetType !== 'ALL') fallbackWhere.target_type = targetType;
+      const [items, total] = await Promise.all([
+        prisma.bookmark.findMany({ where: fallbackWhere, skip, take, orderBy: { created_at: sort }, include }),
+        prisma.bookmark.count({ where: fallbackWhere }),
+      ]);
+      return { items, total };
+    }
+    throw err;
+  }
 }
 
 /**
  * Find an existing bookmark by ID or target ID matching ownership.
+ *
+ * 1. The use of function:
+ *    Locates a specific bookmark ensuring caller owns the record.
+ * 2. How does the specific function work:
+ *    Constructs ownership check (user_id OR business_user_id OR device_id)
+ *    and searches for primary key id or target entity IDs.
+ * 3. Concepts used in the function:
+ *    Row-level authorization, entity lookup.
+ * 4. Places where this function is imported and used:
+ *    Imported and used in src/modules/bookmarks/bookmarks.service.js.
+ * 5. Final output of the function, before and after:
+ *    Before: Lookup criteria { identifier, userId, deviceId }.
+ *    After: Bookmark record or null.
+ *
+ * @param {object} params
+ * @returns {Promise<object|null>}
  */
 async function findBookmarkByIdOrProduct({ identifier, userId, deviceId }) {
   if (!userId && !deviceId) {
     return null;
   }
 
-  const ownerCondition = userId ? { user_id: userId } : { device_id: deviceId };
+  const ownerConditions = userId
+    ? [{ user_id: userId }, { business_user_id: userId }]
+    : [{ device_id: deviceId }];
 
-  return prisma.bookmark.findFirst({
-    where: {
-      AND: [
-        ownerCondition,
-        {
-          OR: [
-            { id: identifier },
-            { product_id: identifier },
-            { document_id: identifier },
-            { testimonial_id: identifier },
+  try {
+    return await prisma.bookmark.findFirst({
+      where: {
+        AND: [
+          { OR: ownerConditions },
+          {
+            OR: [
+              { id: identifier },
+              { product_id: identifier },
+              { document_id: identifier },
+              { testimonial_id: identifier },
+            ],
+          },
+        ],
+      },
+    });
+  } catch (err) {
+    if (err.code === 'P2022' && userId) {
+      return prisma.bookmark.findFirst({
+        where: {
+          AND: [
+            { user_id: userId },
+            {
+              OR: [
+                { id: identifier },
+                { product_id: identifier },
+                { document_id: identifier },
+                { testimonial_id: identifier },
+              ],
+            },
           ],
         },
-      ],
-    },
-  });
+      });
+    }
+    throw err;
+  }
 }
 
 /**
  * Delete bookmark by ID with database-level ownership enforcement.
+ *
+ * 1. The use of function:
+ *    Safely removes a bookmark owned by the authenticated caller or guest device.
+ * 2. How does the specific function work:
+ *    Constructs a scoped delete query ensuring only the owner's bookmark can be deleted.
+ * 3. Concepts used in the function:
+ *    Owner-scoped deletion, tenant data isolation.
+ * 4. Places where this function is imported and used:
+ *    Imported and used in src/modules/bookmarks/bookmarks.service.js.
+ * 5. Final output of the function, before and after:
+ *    Before: Target delete criteria { id, userId, deviceId }.
+ *    After: { count: number } deleted count.
+ *
+ * @param {object|string} target
+ * @returns {Promise<{ count: number }|object>}
  */
 async function deleteBookmark(target) {
   if (typeof target === 'string') {
@@ -212,12 +331,23 @@ async function deleteBookmark(target) {
 
   const where = {
     id,
-    ...(userId ? { user_id: userId } : { device_id: deviceId }),
+    ...(userId
+      ? { OR: [{ user_id: userId }, { business_user_id: userId }] }
+      : { device_id: deviceId }),
   };
 
-  return prisma.bookmark.deleteMany({
-    where,
-  });
+  try {
+    return await prisma.bookmark.deleteMany({
+      where,
+    });
+  } catch (err) {
+    if (err.code === 'P2022' && userId) {
+      return prisma.bookmark.deleteMany({
+        where: { id, user_id: userId },
+      });
+    }
+    throw err;
+  }
 }
 
 /**

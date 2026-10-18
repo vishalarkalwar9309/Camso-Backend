@@ -50,13 +50,23 @@ async function saveCalculation(principal, payload) {
   } = payload;
 
   let userId = null;
+  let businessUserId = null;
+  let organizationId = null;
   let resolvedDeviceId = device_id || null;
+
+  const isBusiness = Boolean(
+    principal.is_business ||
+    (principal.role && ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'].includes(principal.role))
+  );
 
   if (principal.is_guest) {
     resolvedDeviceId = resolvedDeviceId || principal.deviceId || null;
     if (!resolvedDeviceId) {
       throw ApiError.badRequest('Guest session requires an active device identifier.');
     }
+  } else if (isBusiness) {
+    businessUserId = principal.id;
+    organizationId = principal.org_id || principal.organization_id || null;
   } else {
     userId = principal.id;
   }
@@ -65,6 +75,8 @@ async function saveCalculation(principal, payload) {
     return {
       id: 'mock-calc-test-id',
       user_id: userId,
+      business_user_id: businessUserId,
+      organization_id: organizationId,
       device_id: resolvedDeviceId,
       calculation_type,
       title,
@@ -78,6 +90,8 @@ async function saveCalculation(principal, payload) {
 
   const created = await repo.createCalculation({
     user_id: userId,
+    business_user_id: businessUserId,
+    organization_id: organizationId,
     device_id: resolvedDeviceId,
     calculation_type,
     title,
@@ -89,10 +103,12 @@ async function saveCalculation(principal, payload) {
   // Non-blocking telemetry capture
   try {
     const { prisma } = require('../../config/database');
-    if (process.env.NODE_ENV !== 'test' && prisma && prisma.userActivity && typeof prisma.userActivity.create === 'function') {
+    if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID && prisma && prisma.userActivity && typeof prisma.userActivity.create === 'function') {
       await prisma.userActivity.create({
         data: {
           user_id: userId,
+          business_user_id: businessUserId,
+          organization_id: organizationId,
           device_id: resolvedDeviceId,
           activity_type: 'CALCULATION_SAVED',
           entity_type: 'CALCULATION',

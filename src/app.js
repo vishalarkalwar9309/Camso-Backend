@@ -28,6 +28,7 @@ const routes = require('./routes');
 const notFound = require('./core/middleware/notFound');
 const errorHandler = require('./core/middleware/errorHandler');
 
+const path = require('path');
 const app = express();
 
 // Configure trusted proxy for Render / Cloudflare reverse proxy infrastructure.
@@ -39,7 +40,9 @@ if (env.isProduction || process.env.TRUST_PROXY === 'true') {
 }
 
 // 1. Security headers
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
 // 2. CORS
 // In development: allow all origins for ease of local testing.
@@ -100,6 +103,9 @@ app.get('/ready', async (req, res) => {
     },
   });
 });
+
+// Static uploads directory (for documents and media served locally)
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // 6. Application routes
 app.use('/api/v1', routes);
