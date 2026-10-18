@@ -1,10 +1,19 @@
 'use strict';
 
 /**
- * tests/unit/supabase.storage.test.js
- *
- * Comprehensive tests for Supabase Storage integration, document uploads,
- * time-limited signed URL downloads, RBAC authorization, missing files, and error handling.
+ * 1. What this file does:
+ *    Validates Supabase Storage integration, document uploads, time-limited signed URL generation,
+ *    document RBAC authorization, guest download restrictions, and resilient error handling.
+ * 2. Overall design:
+ *    Executes unit test scenarios across storage utility functions and documentsService download workflows,
+ *    mocking Supabase client responses and repository layers to verify security and delivery boundaries.
+ * 3. Elements in the file:
+ *    - describe('Storage Path & Bucket Normalization')
+ *    - describe('Document RBAC, Guest Restrictions & Access Control')
+ *    - describe('Missing Files & Honest Error Handling')
+ *    - describe('Storage Error Handling & Key Secrecy')
+ * 4. Final output of the file:
+ *    Automated Jest test execution validating Supabase Storage security and file delivery.
  */
 
 const { normalizeStoragePath, uploadFileToSupabase, createSignedDownloadUrl } = require('../../src/core/utils/supabaseStorage');
@@ -54,10 +63,11 @@ describe('Supabase Storage Integration & Document Delivery Tests', () => {
   });
 
   describe('Document RBAC, Guest Restrictions & Access Control', () => {
-    it('allows public document download for unauthenticated or guest users', async () => {
+    it('allows public document download for authenticated guest users', async () => {
       const mockDoc = {
         id: 'doc_pub_1',
         document_type: 'CATALOGUE',
+        access_level: 'PUBLIC',
         is_published: true,
         download_count: 5,
         files: [
@@ -76,7 +86,14 @@ describe('Supabase Storage Integration & Document Delivery Tests', () => {
       jest.spyOn(documentsRepository, 'findPublishedDocumentById').mockResolvedValue(mockDoc);
       jest.spyOn(documentsRepository, 'incrementDownloadCount').mockResolvedValue({ ...mockDoc, download_count: 6 });
 
-      const res = await documentsService.downloadDocument('doc_pub_1', 'en', null);
+      // Unauthenticated access must be rejected with 401
+      await expect(documentsService.downloadDocument('doc_pub_1', 'en', null)).rejects.toThrow(
+        /Authentication required to download this document/
+      );
+
+      // Authenticated guest or user is permitted
+      const guestActor = { id: 'guest_1', is_guest: true, role: 'GUEST' };
+      const res = await documentsService.downloadDocument('doc_pub_1', 'en', guestActor);
       expect(res.document_id).toBe('doc_pub_1');
       expect(res.download_url).toBe('https://example.com/catalogue.pdf');
       expect(res.download_count).toBe(6);
@@ -101,6 +118,7 @@ describe('Supabase Storage Integration & Document Delivery Tests', () => {
       const mockDoc = {
         id: 'doc_tech_2',
         document_type: 'TECHNICAL_GUIDE',
+        access_level: 'DEALER',
         is_published: true,
         files: [{ language_code: 'en', media_asset: { url: 'supabase://Camso documents/documents/guide.pdf' } }],
       };
@@ -117,6 +135,7 @@ describe('Supabase Storage Integration & Document Delivery Tests', () => {
       const mockDoc = {
         id: 'doc_org_1',
         document_type: 'TECHNICAL_GUIDE',
+        access_level: 'DEALER',
         is_published: true,
         organization_id: 'ORG_ALPHA',
         files: [{ language_code: 'en', media_asset: { url: 'supabase://Camso documents/documents/guide.pdf' } }],
@@ -165,13 +184,14 @@ describe('Supabase Storage Integration & Document Delivery Tests', () => {
       const mockDoc = {
         id: 'doc_empty_1',
         document_type: 'CATALOGUE',
+        access_level: 'PUBLIC',
         is_published: true,
         files: [],
       };
 
       jest.spyOn(documentsRepository, 'findPublishedDocumentById').mockResolvedValue(mockDoc);
-
-      await expect(documentsService.downloadDocument('doc_empty_1', 'en', null)).rejects.toThrow(
+      const userActor = { id: 'usr_1', is_guest: false, role: 'END_USER' };
+      await expect(documentsService.downloadDocument('doc_empty_1', 'en', userActor)).rejects.toThrow(
         /No downloadable file attached to this document/
       );
     });
@@ -190,6 +210,7 @@ describe('Supabase Storage Integration & Document Delivery Tests', () => {
       const mockDoc = {
         id: 'doc_supabase_err',
         document_type: 'CATALOGUE',
+        access_level: 'PUBLIC',
         is_published: true,
         files: [
           {
@@ -223,7 +244,8 @@ describe('Supabase Storage Integration & Document Delivery Tests', () => {
       });
 
       try {
-        await expect(documentsService.downloadDocument('doc_supabase_err', 'en', null)).rejects.toThrow(
+        const userActor = { id: 'usr_1', is_guest: false, role: 'END_USER' };
+        await expect(documentsService.downloadDocument('doc_supabase_err', 'en', userActor)).rejects.toThrow(
           /Storage signed URL error/
         );
       } finally {

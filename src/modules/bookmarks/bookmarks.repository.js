@@ -20,6 +20,36 @@ async function findProductById(productId) {
 }
 
 /**
+ * Find document by ID including published status.
+ */
+async function findDocumentById(documentId) {
+  return prisma.document.findUnique({
+    where: { id: documentId },
+    select: {
+      id: true,
+      document_type: true,
+      is_published: true,
+    },
+  });
+}
+
+/**
+ * Find testimonial by ID including published status.
+ */
+async function findTestimonialById(testimonialId) {
+  return prisma.testimonial.findUnique({
+    where: { id: testimonialId },
+    select: {
+      id: true,
+      customer_name: true,
+      region: true,
+      story_type: true,
+      is_published: true,
+    },
+  });
+}
+
+/**
  * Find active device associated with a user in user_devices.
  */
 async function findDeviceForUser(userId) {
@@ -31,15 +61,20 @@ async function findDeviceForUser(userId) {
 }
 
 /**
- * Create a new bookmark.
+ * Create a new bookmark (polymorphic: product, document, or testimonial).
  */
-async function createBookmark({ userId, deviceId, productId }) {
+async function createBookmark({ userId, deviceId, productId, targetType = 'PRODUCT', documentId, testimonialId }) {
+  const data = {
+    user_id: userId || null,
+    device_id: deviceId || null,
+    target_type: targetType,
+    product_id: productId || null,
+    document_id: documentId || null,
+    testimonial_id: testimonialId || null,
+  };
+
   return prisma.bookmark.create({
-    data: {
-      user_id: userId || null,
-      device_id: deviceId || null,
-      product_id: productId,
-    },
+    data,
     include: {
       product: {
         include: {
@@ -52,6 +87,21 @@ async function createBookmark({ userId, deviceId, productId }) {
           },
         },
       },
+      document: {
+        include: {
+          files: {
+            take: 1,
+            include: {
+              media_asset: {
+                select: { id: true, url: true, filename: true, mime_type: true, size_bytes: true },
+              },
+            },
+          },
+        },
+      },
+      testimonial: {
+        select: { id: true, customer_name: true, region: true, story_type: true },
+      },
     },
   });
 }
@@ -59,15 +109,18 @@ async function createBookmark({ userId, deviceId, productId }) {
 /**
  * Find paginated bookmarks for a user or guest device.
  */
-async function findBookmarks({ userId, deviceId, skip = 0, take = 20, sort = 'desc' }) {
+async function findBookmarks({ userId, deviceId, skip = 0, take = 20, sort = 'desc', targetType }) {
   if (!userId && !deviceId) {
     return { items: [], total: 0 };
   }
 
   const where = {
-    product: { is_active: true },
     ...(userId ? { user_id: userId } : { device_id: deviceId }),
   };
+
+  if (targetType && targetType !== 'ALL') {
+    where.target_type = targetType;
+  }
 
   const [items, total] = await Promise.all([
     prisma.bookmark.findMany({
@@ -92,6 +145,21 @@ async function findBookmarks({ userId, deviceId, skip = 0, take = 20, sort = 'de
             },
           },
         },
+        document: {
+          include: {
+            files: {
+              take: 1,
+              include: {
+                media_asset: {
+                  select: { id: true, url: true, filename: true, mime_type: true, size_bytes: true },
+                },
+              },
+            },
+          },
+        },
+        testimonial: {
+          select: { id: true, customer_name: true, region: true, story_type: true },
+        },
       },
     }),
     prisma.bookmark.count({ where }),
@@ -101,7 +169,7 @@ async function findBookmarks({ userId, deviceId, skip = 0, take = 20, sort = 'de
 }
 
 /**
- * Find an existing bookmark by ID or product ID matching ownership.
+ * Find an existing bookmark by ID or target ID matching ownership.
  */
 async function findBookmarkByIdOrProduct({ identifier, userId, deviceId }) {
   if (!userId && !deviceId) {
@@ -115,7 +183,12 @@ async function findBookmarkByIdOrProduct({ identifier, userId, deviceId }) {
       AND: [
         ownerCondition,
         {
-          OR: [{ id: identifier }, { product_id: identifier }],
+          OR: [
+            { id: identifier },
+            { product_id: identifier },
+            { document_id: identifier },
+            { testimonial_id: identifier },
+          ],
         },
       ],
     },
@@ -228,6 +301,8 @@ async function findDevice(deviceId) {
 
 module.exports = {
   findProductById,
+  findDocumentById,
+  findTestimonialById,
   findDeviceForUser,
   findDevice,
   createBookmark,

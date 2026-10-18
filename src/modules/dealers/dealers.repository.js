@@ -36,7 +36,7 @@ const dealersRepository = {
   async findNearest({ lat, lng, type, radiusKm }) {
     // 6371 is the radius of the Earth in km
     let query = Prisma.sql`
-      SELECT id, name, type, address, city, state, country, geo_lat, geo_lng, phone, email, has_csr, is_active,
+      SELECT id, name, type, address, city, state, country, geo_lat, geo_lng, location_url, phone, email, has_csr, is_active,
       ( 6371 * acos( cos( radians(${lat}) ) * cos( radians( geo_lat ) ) * cos( radians( geo_lng ) - radians(${lng}) ) + sin( radians(${lat}) ) * sin( radians( geo_lat ) ) ) ) AS distance
       FROM dealers
       WHERE is_active = true
@@ -96,7 +96,8 @@ const dealersRepository = {
         city: true,
         country: true,
         phone: true,
-        email: true
+        email: true,
+        location_url: true,
       }
     });
   },

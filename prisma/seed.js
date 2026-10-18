@@ -152,6 +152,13 @@ async function seed() {
       where: { pid: prodData.pid },
     });
 
+    const sourceAttr = prodData._source_attributes || {};
+    const keyFeatures = sourceAttr.features || [];
+    const applications = sourceAttr.applications || [];
+    const compatibleEquipment = sourceAttr.compatibleEquipment || [];
+    const isFeatured = Boolean(sourceAttr.isFeatured);
+    const dataProvenance = 'DEMO — pending CAMSO confirmation';
+
     let product;
     if (existingProduct) {
       product = await prisma.product.update({
@@ -162,6 +169,11 @@ async function seed() {
           description: existingProduct.description || prodData.description || null,
           category_id: categoryId,
           is_active: existingProduct.is_active ?? prodData.is_active ?? true,
+          is_featured: existingProduct.is_featured ?? isFeatured,
+          key_features: keyFeatures.length > 0 ? keyFeatures : existingProduct.key_features,
+          applications: applications.length > 0 ? applications : existingProduct.applications,
+          compatible_equipment: compatibleEquipment.length > 0 ? compatibleEquipment : existingProduct.compatible_equipment,
+          data_provenance: existingProduct.data_provenance || dataProvenance,
         },
       });
       productsUpdated++;
@@ -175,6 +187,11 @@ async function seed() {
           description: prodData.description || null,
           category_id: categoryId,
           is_active: prodData.is_active ?? true,
+          is_featured: isFeatured,
+          key_features: keyFeatures,
+          applications: applications,
+          compatible_equipment: compatibleEquipment,
+          data_provenance: dataProvenance,
         },
       });
       productsCreated++;
@@ -295,7 +312,7 @@ async function seed() {
       title: 'About CAMSO',
       content: {
         brand: 'CAMSO',
-        company: 'CEAT Ltd. / A Michelin Group Company',
+        company: 'Camso Inc. / A Michelin Group Company',
         tagline: 'Compact Construction Tires and Tracks',
         description: 'Engineered for extreme performance and uptime in heavy construction and industrial applications.',
         version: '1.0.0',
@@ -321,7 +338,7 @@ async function seed() {
       content: {
         terms_url: '/legal/terms',
         privacy_policy_url: '/legal/privacy',
-        copyright: '© 2026 CEAT Ltd. / Camso. All rights reserved.',
+        copyright: '© 2026 Camso. All rights reserved.',
       },
       extra: {},
       is_active: true,

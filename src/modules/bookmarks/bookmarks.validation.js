@@ -4,19 +4,23 @@ const Joi = require('joi');
 const ApiError = require('../../core/utils/ApiError');
 
 const addBookmarkSchema = Joi.object({
-  product_id: Joi.string().required().trim().messages({
-    'any.required': 'product_id is required.',
-    'string.empty': 'product_id cannot be empty.',
-  }),
+  target_type: Joi.string().valid('PRODUCT', 'DOCUMENT', 'TESTIMONIAL').default('PRODUCT'),
+  product_id: Joi.string().trim().optional(),
+  document_id: Joi.string().trim().optional(),
+  testimonial_id: Joi.string().trim().optional(),
+  target_id: Joi.string().trim().optional(),
   device_id: Joi.string().trim().max(100).optional().messages({
     'string.max': 'device_id cannot exceed 100 characters.',
   }),
+}).or('product_id', 'document_id', 'testimonial_id', 'target_id').messages({
+  'object.missing': 'product_id is required.',
 });
 
 const listBookmarksSchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   pageSize: Joi.number().integer().min(1).max(100).default(20),
   device_id: Joi.string().trim().max(100).optional(),
+  target_type: Joi.string().valid('ALL', 'PRODUCT', 'DOCUMENT', 'TESTIMONIAL').default('ALL'),
   sort: Joi.string().valid('asc', 'desc').default('desc'),
 });
 

@@ -30,6 +30,8 @@ async function findProducts({
   pageSize = 20,
   sort = 'newest',
   activeOnly = true,
+  is_new,
+  is_featured,
 } = {}) {
   const where = {};
 
@@ -37,13 +39,21 @@ async function findProducts({
     where.is_active = true;
   }
 
-  if (categoryId) {
+  if (categoryId && categoryId.trim() && categoryId.trim().toLowerCase() !== 'all') {
     where.category = {
       OR: [
-        { id: categoryId },
-        { slug: categoryId },
+        { id: categoryId.trim() },
+        { slug: categoryId.trim() },
       ],
     };
+  }
+
+  if (is_featured !== undefined) {
+    where.is_featured = Boolean(is_featured === true || is_featured === 'true');
+  }
+
+  if (is_new !== undefined && (is_new === true || is_new === 'true')) {
+    where.created_at = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
   }
 
   if (q && q.trim()) {

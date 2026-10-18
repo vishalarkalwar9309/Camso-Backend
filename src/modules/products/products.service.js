@@ -50,16 +50,38 @@ function extractSpecFilters(query) {
 }
 
 /**
+ * Normalizes and formats a product entity for API response contracts.
+ * Computes dynamic is_new, exposes deep linking share_url, and provides defaults for rich attributes.
+ *
+ * @param {object} p
+ * @returns {object}
+ */
+function formatProduct(p) {
+  if (!p) return null;
+  const isNew = Boolean(p.created_at && (Date.now() - new Date(p.created_at).getTime()) <= 7 * 24 * 60 * 60 * 1000);
+  return {
+    ...p,
+    is_new: isNew,
+    is_featured: p.is_featured ?? false,
+    share_url: `https://camso.co/products/${p.slug || p.id}`,
+    key_features: p.key_features || [],
+    applications: p.applications || [],
+    compatible_equipment: p.compatible_equipment || [],
+    data_provenance: p.data_provenance || 'PROVISIONAL',
+  };
+}
+
+/**
  * GET /api/v1/products — public product listing with multi-attribute filtering.
  *
  * @param {object} query
  * @returns {Promise<{ items: object[], total: number }>}
  */
 async function getPublicProducts(query) {
-  const { category, q, page = 1, pageSize = 20, sort = 'newest' } = query;
+  const { category, q, page = 1, pageSize = 20, sort = 'newest', is_new, is_featured } = query;
   const specFilters = extractSpecFilters(query);
 
-  return repo.findProducts({
+  const result = await repo.findProducts({
     categoryId: category,
     q,
     specFilters,
@@ -67,7 +89,14 @@ async function getPublicProducts(query) {
     pageSize: Number(pageSize),
     sort,
     activeOnly: true,
+    is_new,
+    is_featured,
   });
+
+  return {
+    ...result,
+    items: result.items.map(formatProduct),
+  };
 }
 
 /**
@@ -81,7 +110,7 @@ async function getPublicProductDetail(identifier) {
   if (!product) {
     throw ApiError.notFound('Product not found.');
   }
-  return product;
+  return formatProduct(product);
 }
 
 /**
@@ -147,11 +176,16 @@ async function createProduct(adminId, payload) {
 
   const productData = {
     pid,
-    category_id: category.id,
-    name:        payload.name.trim(),
-    slug:        finalSlug,
-    description: payload.description || null,
-    is_active:   payload.is_active ?? true,
+    category_id:          category.id,
+    name:                 payload.name.trim(),
+    slug:                 finalSlug,
+    description:          payload.description || null,
+    is_active:            payload.is_active ?? true,
+    is_featured:          payload.is_featured ?? false,
+    key_features:         payload.key_features || [],
+    applications:         payload.applications || [],
+    compatible_equipment: payload.compatible_equipment || [],
+    data_provenance:      payload.data_provenance || 'PROVISIONAL',
   };
 
   const specifications = Array.isArray(payload.specifications) ? payload.specifications : [];

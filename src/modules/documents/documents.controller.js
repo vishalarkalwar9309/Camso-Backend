@@ -105,8 +105,11 @@ const documentsController = {
               org_id: decoded.org_id || null,
             };
           }
-        } catch (_) {
-          // Token invalid or expired
+        } catch (err) {
+          if (err.name === 'TokenExpiredError') {
+            throw require('../../core/utils/ApiError').unauthorized('Access token expired.', 'TOKEN_EXPIRED');
+          }
+          throw require('../../core/utils/ApiError').unauthorized('Invalid access token.', 'INVALID_TOKEN');
         }
       }
     }

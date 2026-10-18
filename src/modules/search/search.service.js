@@ -84,6 +84,22 @@ async function search(queryParams, authContext = {}) {
       // Log error internally without failing client response
       console.error('[SEARCH LOGGING ERROR]', err.message);
     });
+
+    try {
+      const { prisma } = require('../../config/database');
+      if (process.env.NODE_ENV !== 'test' && prisma && prisma.userActivity && typeof prisma.userActivity.create === 'function') {
+        prisma.userActivity.create({
+          data: {
+            user_id: authContext.userId || null,
+            device_id: authContext.deviceId || null,
+            activity_type: 'SEARCH',
+            entity_type: 'SEARCH_QUERY',
+            entity_id: normalizedQ,
+            metadata: filtersMeta,
+          },
+        }).catch(() => {});
+      }
+    } catch (_) {}
   }
 
   return { items, total, query: normalizedQ };

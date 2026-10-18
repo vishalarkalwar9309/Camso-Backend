@@ -81,8 +81,9 @@ module.exports = {
       country: Joi.string().trim().max(10).required(),
       geo_lat: Joi.number().min(-90).max(90).required(),
       geo_lng: Joi.number().min(-180).max(180).required(),
-      phone: Joi.string().trim().max(30).required(),
-      email: Joi.string().email({ tlds: { allow: false } }).max(255).required(),
+      phone: Joi.string().trim().max(50).allow(null, '').optional(),
+      email: Joi.string().email({ tlds: { allow: false } }).max(255).allow(null, '').optional(),
+      location_url: Joi.string().trim().max(500).allow(null, '').optional(),
       has_csr: Joi.boolean().default(false),
       is_active: Joi.boolean().default(true),
     });
@@ -107,8 +108,9 @@ module.exports = {
       country: Joi.string().trim().max(10).optional(),
       geo_lat: Joi.number().min(-90).max(90).optional(),
       geo_lng: Joi.number().min(-180).max(180).optional(),
-      phone: Joi.string().trim().max(30).optional(),
-      email: Joi.string().email({ tlds: { allow: false } }).max(255).optional(),
+      phone: Joi.string().trim().max(50).allow(null, '').optional(),
+      email: Joi.string().email({ tlds: { allow: false } }).max(255).allow(null, '').optional(),
+      location_url: Joi.string().trim().max(500).allow(null, '').optional(),
       has_csr: Joi.boolean().optional(),
       is_active: Joi.boolean().optional(),
     });

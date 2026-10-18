@@ -1,34 +1,52 @@
 'use strict';
 
 /**
- * authGuard — Express middleware that authenticates a request via Bearer JWT.
+ * authGuard.js
  *
- * Attaches req.user = { id, is_guest } from the verified JWT payload.
- *
- * SECURITY:
- *   Identity is derived EXCLUSIVELY from the verified JWT payload (decoded.sub).
- *   req.body, req.query, and req.params are NEVER consulted for identity.
- *   A client-supplied user_id is never trusted.
- *
- * Usage:
- *   router.get('/protected', authGuard, asyncHandler(controller.handler));
+ * 1. What this file does:
+ *    Express middleware that authenticates incoming HTTP requests via Bearer JWT tokens,
+ *    populating `req.user` and `req.principal` with authenticated actor claims.
+ * 2. Overall design:
+ *    Inspects the HTTP Authorization header, verifies signature and expiration via tokenService,
+ *    and produces differentiated, machine-readable ApiError responses (TOKEN_EXPIRED, INVALID_TOKEN, UNAUTHORIZED).
+ * 3. Elements in the file:
+ *    - function authGuard: Express middleware function.
+ * 4. Final output of the file:
+ *    Exports the authGuard middleware function.
  */
 
 const { verifyAccessToken } = require('../utils/tokenService');
 const ApiError = require('../utils/ApiError');
 
+/**
+ * authGuard
+ *
+ * 1. The use of function:
+ *    Authenticates end users and guest devices accessing protected routes.
+ * 2. How does the specific function work:
+ *    Validates the presence of `Bearer <token>`, decodes claims via `verifyAccessToken()`,
+ *    attaches sanitized context to `req.user` and `req.principal`, and catches `TokenExpiredError`
+ *    to return explicit `TOKEN_EXPIRED` machine codes.
+ * 3. Concepts used in the function:
+ *    Bearer token parsing, cryptographically verified claims attachment, differentiated auth error codes.
+ * 4. Places where this function is imported and used:
+ *    Mounted across protected user routes, bookmark routes, activity routes, and calculation routes.
+ * 5. Final output of the function, before and after:
+ *    Before: Unauthenticated Express request with Authorization header.
+ *    After: Authenticated Express request with req.user and req.principal populated, or 401 error forwarded to next().
+ */
 function authGuard(req, res, next) {
   const authHeader = req.headers.authorization;
 
   // 1. Header must be present and match 'Bearer <token>'
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(ApiError.unauthorized('Authentication required.'));
+    return next(ApiError.unauthorized('Authentication required.', 'UNAUTHORIZED'));
   }
 
   const token = authHeader.slice(7); // strip 'Bearer '
 
   if (!token) {
-    return next(ApiError.unauthorized('Authentication required.'));
+    return next(ApiError.unauthorized('Authentication required.', 'UNAUTHORIZED'));
   }
 
   // 2. Verify the JWT
@@ -52,10 +70,10 @@ function authGuard(req, res, next) {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return next(ApiError.unauthorized('Access token expired.'));
+      return next(ApiError.unauthorized('Access token expired.', 'TOKEN_EXPIRED'));
     }
     // JsonWebTokenError, NotBeforeError, or any other jwt failure
-    return next(ApiError.unauthorized('Invalid access token.'));
+    return next(ApiError.unauthorized('Invalid access token.', 'INVALID_TOKEN'));
   }
 }
 

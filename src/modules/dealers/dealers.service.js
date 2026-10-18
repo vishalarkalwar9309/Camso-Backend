@@ -29,6 +29,38 @@ const auditService = require('../../core/services/auditService');
 const ApiError = require('../../core/utils/ApiError');
 const { parsePagination, buildPaginationMeta } = require('../../core/utils/pagination');
 
+/**
+ * Formats dealer records for API consumption:
+ * - Parses Decimal geo_lat and geo_lng into IEEE 754 floating-point numbers.
+ * - Provides latitude and longitude field aliases for mobile client double deserializers.
+ * - Computes default Google Maps navigation links when location_url is unspecified.
+ * - Provides safe null handling for contact attributes.
+ *
+ * @param {object} d
+ * @returns {object}
+ */
+function formatDealer(d) {
+  if (!d) return null;
+  const latNum = d.geo_lat != null ? parseFloat(d.geo_lat) : null;
+  const lngNum = d.geo_lng != null ? parseFloat(d.geo_lng) : null;
+  const distanceNum = d.distance != null ? parseFloat(d.distance) : undefined;
+  const defaultLocationUrl = (latNum !== null && lngNum !== null)
+    ? `https://www.google.com/maps/search/?api=1&query=${latNum},${lngNum}`
+    : null;
+
+  return {
+    ...d,
+    geo_lat: latNum,
+    geo_lng: lngNum,
+    latitude: latNum,
+    longitude: lngNum,
+    distance: distanceNum,
+    location_url: d.location_url || defaultLocationUrl,
+    phone: d.phone || null,
+    email: d.email || null,
+  };
+}
+
 const dealersService = {
   /**
    * getLocator
@@ -36,24 +68,27 @@ const dealersService = {
    */
   async getLocator({ lat, lng, type, radiusKm, query, q }) {
     const searchQuery = query || q;
+    let dealers;
     if (lat !== undefined && lng !== undefined && lat !== null && lng !== null && String(lat).trim() !== '' && String(lng).trim() !== '') {
       const nLat = parseFloat(lat);
       const nLng = parseFloat(lng);
       const nRad = parseFloat(radiusKm || 1000);
       const normalizedType = type === 'DISTRIBUTOR_HUB' ? 'DISTRIBUTOR' : type;
 
-      return dealersRepository.findNearest({
+      dealers = await dealersRepository.findNearest({
         lat: nLat,
         lng: nLng,
         type: normalizedType,
         radiusKm: nRad,
       });
+    } else {
+      dealers = await dealersRepository.findAllActive({
+        type,
+        query: searchQuery,
+      });
     }
 
-    return dealersRepository.findAllActive({
-      type,
-      query: searchQuery,
-    });
+    return (dealers || []).map(formatDealer);
   },
 
   /**
@@ -61,7 +96,8 @@ const dealersService = {
    * Retrieves the CSR contact details for a specified country.
    */
   async getCsrContact({ country }) {
-    return dealersRepository.findCsrContact({ country });
+    const csr = await dealersRepository.findCsrContact({ country });
+    return csr ? formatDealer(csr) : null;
   },
 
   /**
@@ -165,6 +201,8 @@ const dealersService = {
     });
     return after;
   },
+  formatDealer,
 };
 
+dealersService.formatDealer = formatDealer;
 module.exports = dealersService;

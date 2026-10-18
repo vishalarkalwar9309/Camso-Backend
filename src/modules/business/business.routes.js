@@ -195,4 +195,193 @@ router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res
   }
 });
 
+/**
+ * GET /api/v1/business/dealer/documents
+ * Restricted to DEALER and DISTRIBUTOR personas.
+ * Returns dealer commercial and technical documentation (warranty guides, catalogues, bulletins).
+ */
+router.get('/dealer/documents', requireBusinessRole('DEALER', 'DISTRIBUTOR'), async (req, res, next) => {
+  try {
+    const rawDocuments = await prisma.document.findMany({
+      where: {
+        is_published: true,
+        access_level: { in: ['PUBLIC', 'DEALER'] },
+      },
+      include: {
+        files: {
+          select: {
+            id: true,
+            language_code: true,
+            is_offline_downloadable: true,
+            media_asset: {
+              select: {
+                id: true,
+                url: true,
+                filename: true,
+                mime_type: true,
+                size_bytes: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const docIds = rawDocuments.map((d) => d.id);
+    const translations = await prisma.translation.findMany({
+      where: {
+        entity_type: { in: ['DOCUMENT', 'document'] },
+        entity_id: { in: docIds },
+        field: 'title',
+      },
+    });
+
+    const titleMap = {};
+    for (const t of translations) {
+      if (!titleMap[t.entity_id] || t.language_code === 'en') {
+        titleMap[t.entity_id] = t.value;
+      }
+    }
+
+    const documents = rawDocuments.map((doc) => {
+      const files = doc.files || [];
+      const primaryFile = files.find((f) => f.language_code === 'en') || files[0] || null;
+      const media = primaryFile?.media_asset || null;
+
+      return {
+        id: doc.id,
+        title: titleMap[doc.id] || doc.document_type.replace(/_/g, ' '),
+        type: doc.document_type,
+        document_type: doc.document_type,
+        category: doc.category_id || 'commercial',
+        product_id: doc.product_id,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+        has_file: Boolean(media && media.url),
+        file_size_bytes: media?.size_bytes || null,
+        mime_type: media?.mime_type || 'application/pdf',
+        filename: media?.filename || null,
+        is_offline_downloadable: primaryFile?.is_offline_downloadable ?? false,
+        access_level: doc.access_level || 'DEALER',
+        download_url: media && media.url ? `/api/v1/documents/${doc.id}/download` : null,
+        files: files.map((f) => ({
+          id: f.id,
+          language_code: f.language_code,
+          is_offline_downloadable: f.is_offline_downloadable,
+          size_bytes: f.media_asset?.size_bytes || null,
+          mime_type: f.media_asset?.mime_type || null,
+          filename: f.media_asset?.filename || null,
+        })),
+      };
+    });
+
+    sendSuccess(res, documents, 200);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/v1/business/distributor/documents
+ * Restricted to DISTRIBUTOR persona only.
+ * Returns distributor-level regional guidelines, bulk catalogues, and technical bulletins.
+ */
+router.get('/distributor/documents', requireBusinessRole('DISTRIBUTOR'), async (req, res, next) => {
+  try {
+    const rawDocuments = await prisma.document.findMany({
+      where: {
+        is_published: true,
+        access_level: { in: ['PUBLIC', 'DEALER', 'DISTRIBUTOR'] },
+      },
+      include: {
+        files: {
+          select: {
+            id: true,
+            language_code: true,
+            is_offline_downloadable: true,
+            media_asset: {
+              select: {
+                id: true,
+                url: true,
+                filename: true,
+                mime_type: true,
+                size_bytes: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const docIds = rawDocuments.map((d) => d.id);
+    const translations = await prisma.translation.findMany({
+      where: {
+        entity_type: { in: ['DOCUMENT', 'document'] },
+        entity_id: { in: docIds },
+        field: 'title',
+      },
+    });
+
+    const titleMap = {};
+    for (const t of translations) {
+      if (!titleMap[t.entity_id] || t.language_code === 'en') {
+        titleMap[t.entity_id] = t.value;
+      }
+    }
+
+    const documents = rawDocuments.map((doc) => {
+      const files = doc.files || [];
+      const primaryFile = files.find((f) => f.language_code === 'en') || files[0] || null;
+      const media = primaryFile?.media_asset || null;
+
+      return {
+        id: doc.id,
+        title: titleMap[doc.id] || doc.document_type.replace(/_/g, ' '),
+        type: doc.document_type,
+        document_type: doc.document_type,
+        category: doc.category_id || 'distribution',
+        product_id: doc.product_id,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+        has_file: Boolean(media && media.url),
+        file_size_bytes: media?.size_bytes || null,
+        mime_type: media?.mime_type || 'application/pdf',
+        filename: media?.filename || null,
+        is_offline_downloadable: primaryFile?.is_offline_downloadable ?? false,
+        access_level: doc.access_level || 'DISTRIBUTOR',
+        download_url: media && media.url ? `/api/v1/documents/${doc.id}/download` : null,
+        files: files.map((f) => ({
+          id: f.id,
+          language_code: f.language_code,
+          is_offline_downloadable: f.is_offline_downloadable,
+          size_bytes: f.media_asset?.size_bytes || null,
+          mime_type: f.media_asset?.mime_type || null,
+          filename: f.media_asset?.filename || null,
+        })),
+      };
+    });
+
+    sendSuccess(res, documents, 200);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/v1/business/activity
+ * Activity log feed for the authenticated business user/organization.
+ */
+router.get('/activity', async (req, res, next) => {
+  try {
+    const activityService = require('../activity/activity.service');
+    const { items, pagination } = await activityService.getBusinessActivities(req.businessUser, req.query);
+    sendSuccess(res, items, 200, pagination);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
+

@@ -46,20 +46,27 @@ function validate(schema, source = 'body', allowUnknown = false) {
 }
 
 const listProductsQuerySchema = Joi.object({
-  category: Joi.string().trim().optional(),
-  q:        Joi.string().trim().max(100).optional(),
-  page:     Joi.number().integer().min(1).default(1),
-  pageSize: Joi.number().integer().min(1).max(100).default(20),
-  sort:     Joi.string().trim().valid('name_asc', 'name_desc', 'newest', 'oldest', 'pid_asc').default('newest'),
+  category:    Joi.string().trim().optional(),
+  q:           Joi.string().trim().max(100).optional(),
+  page:        Joi.number().integer().min(1).default(1),
+  pageSize:    Joi.number().integer().min(1).max(100).default(20),
+  sort:        Joi.string().trim().valid('name_asc', 'name_desc', 'newest', 'oldest', 'pid_asc').default('newest'),
+  is_new:      Joi.boolean().optional(),
+  is_featured: Joi.boolean().optional(),
 }).unknown(true); // Allow dynamic spec_<key>=<value> query parameters
 
 const createProductSchema = Joi.object({
-  pid:         Joi.string().trim().uppercase().min(1).max(50).required(),
-  category_id: Joi.string().trim().min(1).required(),
-  name:        Joi.string().trim().min(1).max(150).required(),
-  slug:        Joi.string().trim().lowercase().min(1).max(180).optional(),
-  description: Joi.string().trim().max(2000).allow(null, '').optional(),
-  is_active:   Joi.boolean().default(true).optional(),
+  pid:                  Joi.string().trim().uppercase().min(1).max(50).required(),
+  category_id:          Joi.string().trim().min(1).required(),
+  name:                 Joi.string().trim().min(1).max(150).required(),
+  slug:                 Joi.string().trim().lowercase().min(1).max(180).optional(),
+  description:          Joi.string().trim().max(2000).allow(null, '').optional(),
+  is_active:            Joi.boolean().default(true).optional(),
+  is_featured:          Joi.boolean().default(false).optional(),
+  key_features:         Joi.array().items(Joi.string().trim()).default([]).optional(),
+  applications:         Joi.array().items(Joi.string().trim()).default([]).optional(),
+  compatible_equipment: Joi.array().items(Joi.string().trim()).default([]).optional(),
+  data_provenance:      Joi.string().trim().max(100).default('PROVISIONAL').optional(),
   specifications: Joi.array().items(
     Joi.object({
       spec_type:     Joi.string().valid('SPECIFICATION', 'DIMENSION', 'PERFORMANCE').default('SPECIFICATION'),
@@ -73,11 +80,16 @@ const createProductSchema = Joi.object({
 });
 
 const updateProductSchema = Joi.object({
-  category_id: Joi.string().trim().min(1).optional(),
-  name:        Joi.string().trim().min(1).max(150).optional(),
-  slug:        Joi.string().trim().lowercase().min(1).max(180).optional(),
-  description: Joi.string().trim().max(2000).allow(null, '').optional(),
-  is_active:   Joi.boolean().optional(),
+  category_id:          Joi.string().trim().min(1).optional(),
+  name:                 Joi.string().trim().min(1).max(150).optional(),
+  slug:                 Joi.string().trim().lowercase().min(1).max(180).optional(),
+  description:          Joi.string().trim().max(2000).allow(null, '').optional(),
+  is_active:            Joi.boolean().optional(),
+  is_featured:          Joi.boolean().optional(),
+  key_features:         Joi.array().items(Joi.string().trim()).optional(),
+  applications:         Joi.array().items(Joi.string().trim()).optional(),
+  compatible_equipment: Joi.array().items(Joi.string().trim()).optional(),
+  data_provenance:      Joi.string().trim().max(100).optional(),
 }).min(1);
 
 const attachImageSchema = Joi.object({

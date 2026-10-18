@@ -35,13 +35,34 @@ const feedbackService = {
     // Derive identity securely from principal
     const isEndUser = principal.type === 'USER' || principal.type === 'END_USER' || principal.type === 'CUSTOMER' || (principal.is_guest === false);
     const user_id = isEndUser && principal.type !== 'GUEST' ? principal.id : null;
-    const device_id = principal.deviceId || principal.device_id || 'unknown_device';
-
-    return feedbackRepository.createFeedback({
+    const feedback = await feedbackRepository.createFeedback({
       ...payload,
       user_id,
       device_id
     });
+
+    // Record user activity non-blockingly
+    try {
+      const { prisma } = require('../../config/database');
+      if (process.env.NODE_ENV !== 'test' && prisma && prisma.userActivity && typeof prisma.userActivity.create === 'function') {
+        await prisma.userActivity.create({
+          data: {
+            user_id,
+            device_id,
+            activity_type: 'FEEDBACK_SUBMITTED',
+            entity_type: 'FEEDBACK',
+            entity_id: feedback.id,
+            metadata: {
+              bucket: payload.bucket,
+              rating: payload.rating,
+              product_id: payload.product_id || null,
+            },
+          },
+        }).catch(() => {});
+      }
+    } catch (_) {}
+
+    return feedback;
   },
 
   /**

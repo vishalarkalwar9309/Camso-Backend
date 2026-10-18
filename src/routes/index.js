@@ -82,6 +82,14 @@ router.use('/search', searchRoutes);
 const bookmarksRoutes = require('../modules/bookmarks/bookmarks.routes');
 router.use('/bookmarks', bookmarksRoutes);
 
+// Activity & Telemetry
+const activityRoutes = require('../modules/activity/activity.routes');
+router.use('/activity', activityRoutes);
+
+// User Engineering & ROI Calculations
+const calculationsRoutes = require('../modules/calculations/calculations.routes');
+router.use('/calculations', calculationsRoutes);
+
 // Task 1.6: Catalogue Analytics
 const adminAnalyticsRoutes = require('../modules/analytics/analytics.admin.routes');
 router.use('/admin/analytics', adminAnalyticsRoutes);

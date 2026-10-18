@@ -41,6 +41,17 @@ function resolveDocumentAccessLevel(doc) {
 
   const title = (doc.title || '').toLowerCase();
 
+  // 0. Admin & internal confidential documents (FAIL-CLOSED)
+  if (
+    title.includes('admin') ||
+    title.includes('confidential') ||
+    title.includes('management') ||
+    title.includes('internal audit') ||
+    title.includes('restricted-admin')
+  ) {
+    return 'ADMIN';
+  }
+
   // 1. OEM partner technical documentation & CAD envelope specifications
   if (title.includes('oem') || title.includes('cad')) {
     return 'OEM';
@@ -145,7 +156,10 @@ const documentsService = {
       };
     });
 
-    return { documents, pagination: meta };
+    // FAIL-CLOSED: Public browse must strictly return ONLY documents whose resolved access level is PUBLIC
+    const publicDocuments = documents.filter((doc) => doc.access_level === 'PUBLIC');
+
+    return { documents: publicDocuments, pagination: meta };
   },
 
   /**
@@ -167,22 +181,37 @@ const documentsService = {
    * @param {string} lang — requested language code (e.g. 'en', 'fr')
    * @returns {Promise<object>}
    */
-  async getPublishedDocumentById(id, lang = 'en') {
+  async getPublishedDocumentById(id, lang = 'en', actor = null) {
     const doc = await documentsRepository.findPublishedDocumentById(id);
 
     if (!doc) {
       throw ApiError.notFound('Document not found.');
     }
 
+    const callerRole = actor?.role || (actor?.is_guest ? 'GUEST' : (actor ? 'END_USER' : null));
+    const isSuperOrContentAdmin = ['SUPER_ADMIN', 'CONTENT_ADMIN'].includes(callerRole);
+
+    // FAIL-CLOSED SECURITY GUARANTEE:
+    // If the database lacks access_level (unmigrated schema), permissions cannot be safely established.
+    // Classifying by title keywords is unreliable because restricted partner documents may have ordinary titles.
+    // Deny access to all non-admin callers regardless of title.
+    if (!doc.access_level && !isSuperOrContentAdmin) {
+      throw ApiError.notFound('Document not found or access permissions cannot be safely established.');
+    }
+
     const translations = await getTranslations('DOCUMENT', doc.id);
     const localizedDoc = attachTranslations(doc, translations, lang);
+    const accessLevel = resolveDocumentAccessLevel(localizedDoc);
+
+    if (accessLevel === 'ADMIN' && !isSuperOrContentAdmin) {
+      throw ApiError.notFound('Document not found.');
+    }
 
     // Resolve document_files for requested language per contract
     const files = doc.files || [];
     const resolvedFiles = lang ? files.filter((f) => f.language_code === lang) : files;
     const primaryFile = resolvedFiles[0] || files[0] || null;
     const media = primaryFile?.media_asset || null;
-    const accessLevel = resolveDocumentAccessLevel(localizedDoc);
 
     return {
       ...localizedDoc,
@@ -356,20 +385,33 @@ const documentsService = {
     const accessLevel = resolveDocumentAccessLevel(localizedDoc);
     const isPublic = accessLevel === 'PUBLIC';
 
-    if (!isPublic) {
-      // 1. Must be authenticated
-      if (!actor || !actor.id) {
-        throw ApiError.unauthorized('Authentication required to download this document.');
-      }
-      // 2. Guests cannot download restricted technical files
-      if (actor.is_guest) {
-        throw ApiError.forbidden('Guest users are not authorized to download restricted technical documentation.');
+    // 1. Require authentication for ALL document downloads per tester requirement
+    if (!actor || !actor.id) {
+      throw ApiError.unauthorized('Authentication required to download this document.', 'UNAUTHORIZED');
+    }
+
+    const role = actor.role || (actor.is_guest ? 'GUEST' : 'END_USER');
+    const isSuperOrContentAdmin = ['SUPER_ADMIN', 'CONTENT_ADMIN'].includes(role);
+
+    // FAIL-CLOSED SECURITY GUARANTEE:
+    // If the database lacks access_level (unmigrated schema), permissions cannot be safely established.
+    // Classifying by title keywords is unreliable because restricted partner documents may have ordinary titles.
+    // Deny download access to all non-admin callers regardless of title.
+    if (!doc.access_level && !isSuperOrContentAdmin) {
+      throw ApiError.forbidden('Document access permissions cannot be safely established on an unmigrated schema. Access is denied.');
+    }
+
+    if (!isSuperOrContentAdmin) {
+      if (accessLevel === 'ADMIN') {
+        throw ApiError.forbidden('This document is restricted to platform Administrators.');
       }
 
-      const role = actor.role || 'END_USER';
-      const isSuperOrContentAdmin = ['SUPER_ADMIN', 'CONTENT_ADMIN'].includes(role);
+      if (!isPublic) {
+        // Guests cannot download restricted technical files
+        if (actor.is_guest) {
+          throw ApiError.forbidden('Guest users are not authorized to download restricted technical documentation.');
+        }
 
-      if (!isSuperOrContentAdmin) {
         // Enforce role-based access
         if (accessLevel === 'DEALER' && !['DEALER', 'DISTRIBUTOR'].includes(role)) {
           throw ApiError.forbidden('This document is restricted to authorized Dealers and Distributors.');
@@ -379,9 +421,6 @@ const documentsService = {
         }
         if ((accessLevel === 'OEM' || accessLevel === 'OEM_PARTNER') && role !== 'OEM_PARTNER') {
           throw ApiError.forbidden('This document is restricted to OEM Integration Partners.');
-        }
-        if (accessLevel === 'ADMIN') {
-          throw ApiError.forbidden('This document is restricted to platform Administrators.');
         }
         if (['TECHNICAL_GUIDE', 'BULLETIN'].includes(doc.document_type)) {
           const allowedRoles = ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'];
@@ -409,23 +448,29 @@ const documentsService = {
     await documentsRepository.incrementDownloadCount(id);
 
     // Record user activity
-    const actorId = actor?.id || req?.headers?.['x-device-id'] || null;
-    if (actorId) {
-      try {
-        const { prisma } = require('../../config/database');
+    try {
+      const isBusinessActor = ['DEALER', 'DISTRIBUTOR', 'OEM_PARTNER'].includes(role);
+      const { prisma } = require('../../config/database');
+      if (process.env.NODE_ENV !== 'test' && prisma && prisma.userActivity && typeof prisma.userActivity.create === 'function') {
         await prisma.userActivity.create({
           data: {
-            user_id: actor?.is_guest ? null : (actor?.id || null),
-            device_id: typeof actorId === 'string' && !actor?.id ? actorId : null,
+            user_id: isBusinessActor ? null : (actor.is_guest ? null : actor.id),
+            business_user_id: isBusinessActor ? actor.id : null,
+            organization_id: actor.org_id || null,
+            device_id: actor.deviceId || (typeof req?.headers?.['x-device-id'] === 'string' ? req.headers['x-device-id'] : null),
             activity_type: 'DOCUMENT_DOWNLOAD',
             entity_type: 'DOCUMENT',
             entity_id: id,
-            metadata: { document_type: doc.document_type, lang, access_level: isPublic ? 'PUBLIC' : (explicitLevel || 'RESTRICTED') },
+            metadata: {
+              document_type: doc.document_type,
+              lang,
+              access_level: accessLevel,
+            },
           },
-        });
-      } catch (_) {
-        // Non-blocking activity recording
+        }).catch(() => {});
       }
+    } catch (_) {
+      // Non-blocking activity recording
     }
 
     let downloadUrl = media.url;

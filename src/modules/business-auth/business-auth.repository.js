@@ -42,21 +42,65 @@ async function registerBusinessOrganization({ orgData, userData }) {
 }
 
 async function findBusinessUserByEmail(email) {
-  return prisma.businessUser.findUnique({
-    where: { email },
-    include: {
-      organization: true,
-    },
-  });
+  try {
+    return await prisma.businessUser.findUnique({
+      where: { email },
+      include: {
+        organization: true,
+      },
+    });
+  } catch (err) {
+    if (err.code === 'P2022') {
+      return await prisma.businessUser.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          organization_id: true,
+          email: true,
+          password_hash: true,
+          display_name: true,
+          phone: true,
+          role: true,
+          status: true,
+          created_at: true,
+          updated_at: true,
+          organization: true,
+        },
+      });
+    }
+    throw err;
+  }
 }
 
 async function findBusinessUserById(id) {
-  return prisma.businessUser.findUnique({
-    where: { id },
-    include: {
-      organization: true,
-    },
-  });
+  try {
+    return await prisma.businessUser.findUnique({
+      where: { id },
+      include: {
+        organization: true,
+      },
+    });
+  } catch (err) {
+    if (err.code === 'P2022') {
+      return await prisma.businessUser.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          organization_id: true,
+          email: true,
+          password_hash: true,
+          display_name: true,
+          phone: true,
+          role: true,
+          status: true,
+          created_at: true,
+          updated_at: true,
+          organization: true,
+        },
+      });
+    }
+    throw err;
+  }
 }
 
 async function createBusinessRefreshToken({ business_user_id, token_hash, expires_at }) {

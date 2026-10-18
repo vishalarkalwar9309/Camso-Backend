@@ -29,3 +29,6 @@ Thumbs.db
 
 # NOTE: prisma/migrations/ is intentionally NOT ignored.
 # Migration files must be tracked in version control.
+
+
+memory-bank/

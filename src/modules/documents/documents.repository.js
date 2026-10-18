@@ -53,49 +53,112 @@ const documentsRepository = {
   async findPublishedDocuments(filters, pagination, prismaClient = prisma) {
     const where = {
       is_published: true,
+      access_level: { not: 'ADMIN' },
     };
 
     if (filters.product_id) where.product_id = filters.product_id;
     if (filters.category_id) where.category_id = filters.category_id;
     if (filters.document_type) where.document_type = filters.document_type;
+    if (filters.access_level) where.access_level = filters.access_level;
 
     const { orderBy } = parseSort(pagination.sort, ALLOWED_SORT_FIELDS, 'created_at', 'desc');
 
-    return prismaClient.$transaction([
-      prismaClient.document.count({ where }),
-      prismaClient.document.findMany({
-        where,
-        skip: pagination.skip,
-        take: pagination.take,
-        orderBy,
-        select: {
-          id: true,
-          product_id: true,
-          category_id: true,
-          document_type: true,
-          is_published: true,
-          download_count: true,
-          created_at: true,
-          updated_at: true,
-          files: {
-            select: {
-              id: true,
-              language_code: true,
-              is_offline_downloadable: true,
-              media_asset: {
-                select: {
-                  id: true,
-                  url: true,
-                  filename: true,
-                  mime_type: true,
-                  size_bytes: true,
+    try {
+      return await prismaClient.$transaction([
+        prismaClient.document.count({ where }),
+        prismaClient.document.findMany({
+          where,
+          skip: pagination.skip,
+          take: pagination.take,
+          orderBy,
+          select: {
+            id: true,
+            product_id: true,
+            category_id: true,
+            document_type: true,
+            access_level: true,
+            is_published: true,
+            download_count: true,
+            created_at: true,
+            updated_at: true,
+            files: {
+              select: {
+                id: true,
+                language_code: true,
+                is_offline_downloadable: true,
+                media_asset: {
+                  select: {
+                    id: true,
+                    url: true,
+                    filename: true,
+                    mime_type: true,
+                    size_bytes: true,
+                  },
                 },
               },
             },
           },
-        },
-      }),
-    ]);
+        }),
+      ]);
+    } catch (err) {
+      if (err.code === 'P2022') {
+        // FAIL-CLOSED SECURITY STRATEGY ON UNMIGRATED SCHEMA:
+        // 1. If restricted access_level was explicitly requested, the unmigrated database
+        //    cannot safely enforce access boundaries. Fail closed and return empty.
+        if (filters.access_level && filters.access_level !== 'PUBLIC') {
+          return [0, []];
+        }
+        // 2. If restricted document types (technical guides, bulletins) were requested,
+        //    fail closed to prevent exposing sensitive technical specs.
+        if (filters.document_type && ['TECHNICAL_GUIDE', 'BULLETIN'].includes(filters.document_type)) {
+          return [0, []];
+        }
+
+        // 3. For public browse, restrict document types strictly to public types.
+        const fallbackWhere = {
+          is_published: true,
+          document_type: filters.document_type ? filters.document_type : { in: ['CATALOGUE', 'BROCHURE', 'MANUAL'] },
+        };
+        if (filters.product_id) fallbackWhere.product_id = filters.product_id;
+        if (filters.category_id) fallbackWhere.category_id = filters.category_id;
+        return await prismaClient.$transaction([
+          prismaClient.document.count({ where: fallbackWhere }),
+          prismaClient.document.findMany({
+            where: fallbackWhere,
+            skip: pagination.skip,
+            take: pagination.take,
+            orderBy,
+            select: {
+              id: true,
+              product_id: true,
+              category_id: true,
+              document_type: true,
+              is_published: true,
+              download_count: true,
+              created_at: true,
+              updated_at: true,
+              files: {
+                select: {
+                  id: true,
+                  language_code: true,
+                  is_offline_downloadable: true,
+                  media_asset: {
+                    select: {
+                      id: true,
+                      url: true,
+                      filename: true,
+                      mime_type: true,
+                      size_bytes: true,
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        ]);
+      }
+      throw err;
+    }
   },
 
   /**
@@ -116,36 +179,75 @@ const documentsRepository = {
    * @returns {Promise<object|null>}
    */
   async findPublishedDocumentById(id, prismaClient = prisma) {
-    return prismaClient.document.findFirst({
-      where: {
-        id,
-        is_published: true,
-      },
-      select: {
-        id: true,
-        product_id: true,
-        category_id: true,
-        document_type: true,
-        created_at: true,
-        updated_at: true,
-        files: {
-          select: {
-            id: true,
-            language_code: true,
-            is_offline_downloadable: true,
-            media_asset: {
-              select: {
-                id: true,
-                url: true,
-                filename: true,
-                mime_type: true,
-                size_bytes: true,
+    try {
+      return await prismaClient.document.findFirst({
+        where: {
+          id,
+          is_published: true,
+        },
+        select: {
+          id: true,
+          product_id: true,
+          category_id: true,
+          document_type: true,
+          access_level: true,
+          download_count: true,
+          created_at: true,
+          updated_at: true,
+          files: {
+            select: {
+              id: true,
+              language_code: true,
+              is_offline_downloadable: true,
+              media_asset: {
+                select: {
+                  id: true,
+                  url: true,
+                  filename: true,
+                  mime_type: true,
+                  size_bytes: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
+    } catch (err) {
+      if (err.code === 'P2022') {
+        return await prismaClient.document.findFirst({
+          where: {
+            id,
+            is_published: true,
+          },
+          select: {
+            id: true,
+            product_id: true,
+            category_id: true,
+            document_type: true,
+            download_count: true,
+            created_at: true,
+            updated_at: true,
+            files: {
+              select: {
+                id: true,
+                language_code: true,
+                is_offline_downloadable: true,
+                media_asset: {
+                  select: {
+                    id: true,
+                    url: true,
+                    filename: true,
+                    mime_type: true,
+                    size_bytes: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+      throw err;
+    }
   },
   async findAdminDocuments(filters, pagination, prismaClient = prisma) {
     const where = {};

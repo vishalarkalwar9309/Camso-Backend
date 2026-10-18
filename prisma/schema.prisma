@@ -76,6 +76,8 @@ model User {
   devices        UserDevice[]
   search_logs    SearchLog[]
   bookmarks      Bookmark[]
+  activities     UserActivity[]
+  calculations   UserCalculation[]
 
   @@index([created_at])
   @@map("users")
@@ -192,15 +194,21 @@ model Category {
 // slug is unique for SEO and client routing.
 // is_active supports soft-delete.
 model Product {
-  id          String   @id @default(cuid())
-  pid         String   @unique
-  category_id String
-  name        String
-  slug        String   @unique
-  description String?
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  pid                  String   @unique
+  category_id          String
+  name                 String
+  slug                 String   @unique
+  description          String?
+  is_active            Boolean  @default(true)
+  is_featured          Boolean  @default(false)
+  launch_date          DateTime?
+  key_features         String[] @default([])
+  applications         String[] @default([])
+  compatible_equipment String[] @default([])
+  data_provenance      String?  @default("PROVISIONAL")
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
 
   // Relations
   category       Category               @relation(fields: [category_id], references: [id], onDelete: Restrict)
@@ -210,6 +218,7 @@ model Product {
 
   @@index([category_id])
   @@index([is_active])
+  @@index([is_featured])
   @@map("products")
 }
 
@@ -269,6 +278,7 @@ model Language {
   name        String   // English display name
   native_name String?  // Native script display name (e.g. "Français", "Deutsch")
   flag_emoji  String?  // Unicode flag or icon identifier
+  is_default  Boolean  @default(false)
   is_active   Boolean  @default(true)
   sort_order  Int      @default(0)
   created_at  DateTime @default(now())
@@ -340,26 +350,37 @@ model PopularSearch {
 // Bookmarks Models (search.prisma / bookmarks domain)
 // =============================================================================
 
+enum BookmarkTargetType {
+  PRODUCT
+  DOCUMENT
+  TESTIMONIAL
+}
+
 // Bookmark
 // --------
-// Stores saved/bookmarked catalogue products for authenticated users and guest devices.
-// Enforces partial unique indexes via PostgreSQL custom migration:
-//   - bookmarks_user_product_unique on (user_id, product_id) WHERE user_id IS NOT NULL
-//   - bookmarks_device_product_unique on (device_id, product_id) WHERE device_id IS NOT NULL
+// Stores saved/bookmarked items (products, documents, testimonials) for authenticated users and guest devices.
 model Bookmark {
-  id         String   @id @default(cuid())
-  user_id    String?
-  device_id  String?
-  product_id String
-  created_at DateTime @default(now())
+  id             String             @id @default(cuid())
+  user_id        String?
+  device_id      String?
+  target_type    BookmarkTargetType @default(PRODUCT)
+  product_id     String?
+  document_id    String?
+  testimonial_id String?
+  created_at     DateTime           @default(now())
 
   // Relations
-  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  product     Product?     @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  document    Document?    @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  testimonial Testimonial? @relation(fields: [testimonial_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([device_id])
   @@index([product_id])
+  @@index([document_id])
+  @@index([testimonial_id])
+  @@index([target_type])
   @@map("bookmarks")
 }
 
@@ -478,26 +499,29 @@ model BusinessOrganization {
   created_at      DateTime       @default(now())
   updated_at      DateTime       @updatedAt
 
-  members BusinessUser[]
+  members    BusinessUser[]
+  activities UserActivity[]
 
   @@index([type, approval_status])
   @@map("business_organizations")
 }
 
 model BusinessUser {
-  id              String             @id @default(cuid())
-  organization_id String
-  email           String             @unique
-  password_hash   String
-  display_name    String?
-  phone           String?
-  role            BusinessType
-  status          BusinessUserStatus @default(ACTIVE)
-  created_at      DateTime           @default(now())
-  updated_at      DateTime           @updatedAt
+  id                 String             @id @default(cuid())
+  organization_id    String
+  email              String             @unique
+  password_hash      String
+  display_name       String?
+  phone              String?
+  role               BusinessType
+  status             BusinessUserStatus @default(ACTIVE)
+  preferred_language String             @default("en")
+  created_at         DateTime           @default(now())
+  updated_at         DateTime           @updatedAt
 
   organization   BusinessOrganization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   refresh_tokens BusinessRefreshToken[]
+  activities     UserActivity[]
 
   @@index([organization_id])
   @@index([role, status])
@@ -558,6 +582,14 @@ model MediaAsset {
 // Content CMS Domain Models (Documents, Testimonials, FAQs, Dealers, Feedback)
 // =============================================================================
 
+enum DocumentAccessLevel {
+  PUBLIC
+  DEALER
+  DISTRIBUTOR
+  OEM
+  ADMIN
+}
+
 enum DocumentType {
   CATALOGUE
   BROCHURE
@@ -569,19 +601,22 @@ enum DocumentType {
 }
 
 model Document {
-  id             String       @id @default(cuid())
+  id             String              @id @default(cuid())
   product_id     String?
   category_id    String?
   document_type  DocumentType
-  is_published   Boolean      @default(false)
-  download_count Int          @default(0)
-  created_at     DateTime     @default(now())
-  updated_at     DateTime     @updatedAt
+  access_level   DocumentAccessLevel @default(PUBLIC)
+  is_published   Boolean             @default(false)
+  download_count Int                 @default(0)
+  created_at     DateTime            @default(now())
+  updated_at     DateTime            @updatedAt
 
-  files DocumentFile[]
+  files     DocumentFile[]
+  bookmarks Bookmark[]
 
   @@index([product_id])
   @@index([category_id])
+  @@index([access_level])
   @@index([is_published])
   @@map("documents")
 }
@@ -620,6 +655,7 @@ model Testimonial {
   updated_at     DateTime    @updatedAt
 
   media_asset MediaAsset? @relation(fields: [media_asset_id], references: [id], onDelete: SetNull)
+  bookmarks   Bookmark[]
 
   @@index([product_id])
   @@index([is_published])
@@ -652,19 +688,20 @@ enum DealerType {
 }
 
 model Dealer {
-  id        String     @id @default(cuid())
-  name      String     @db.VarChar(255)
-  type      DealerType
-  address   String     @db.Text
-  city      String     @db.VarChar(100)
-  state     String     @db.VarChar(100)
-  country   String     @db.VarChar(10)
-  geo_lat   Decimal    @db.Decimal(10, 7)
-  geo_lng   Decimal    @db.Decimal(10, 7)
-  phone     String?    @db.VarChar(50)
-  email     String?    @db.VarChar(255)
-  has_csr   Boolean    @default(false)
-  is_active Boolean    @default(true)
+  id           String     @id @default(cuid())
+  name         String     @db.VarChar(255)
+  type         DealerType
+  address      String     @db.Text
+  city         String     @db.VarChar(100)
+  state        String     @db.VarChar(100)
+  country      String     @db.VarChar(10)
+  geo_lat      Decimal    @db.Decimal(10, 7)
+  geo_lng      Decimal    @db.Decimal(10, 7)
+  location_url String?    @db.VarChar(500)
+  phone        String?    @db.VarChar(50)
+  email        String?    @db.VarChar(255)
+  has_csr      Boolean    @default(false)
+  is_active    Boolean    @default(true)
 
   @@index([country, is_active])
   @@index([geo_lat, geo_lng])
@@ -759,6 +796,64 @@ model Campaign {
   @@map("campaigns")
 }
 
+// =============================================================================
+// User Analytics & Tooling Domain Models (Activity & Calculations)
+// =============================================================================
 
+enum ActivityType {
+  SEARCH
+  PRODUCT_VIEW
+  DOCUMENT_VIEW
+  DOCUMENT_DOWNLOAD
+  BOOKMARK_ADD
+  BOOKMARK_REMOVE
+  CALCULATION_SAVED
+  FEEDBACK_SUBMITTED
+  LOGIN
+  LOGOUT
+}
 
+model UserActivity {
+  id               String                 @id @default(cuid())
+  user_id          String?
+  business_user_id String?
+  organization_id  String?
+  device_id        String?
+  activity_type    ActivityType
+  entity_type      String?                @db.VarChar(100)
+  entity_id        String?
+  metadata         Json?
+  ip_address       String?
+  user_agent       String?
+  created_at       DateTime               @default(now())
 
+  user          User?                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  business_user BusinessUser?         @relation(fields: [business_user_id], references: [id], onDelete: Cascade)
+  organization  BusinessOrganization? @relation(fields: [organization_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, created_at])
+  @@index([business_user_id, created_at])
+  @@index([device_id, created_at])
+  @@index([activity_type, created_at])
+  @@map("user_activities")
+}
+
+model UserCalculation {
+  id               String   @id @default(cuid())
+  user_id          String?
+  device_id        String?
+  calculation_type String   @db.VarChar(100)
+  title            String?  @db.VarChar(255)
+  inputs           Json
+  results          Json
+  notes            String?  @db.Text
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@index([device_id, created_at])
+  @@index([calculation_type])
+  @@map("user_calculations")
+}
