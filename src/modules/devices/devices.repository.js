@@ -1,19 +1,32 @@
 'use strict';
 
 /**
- * devices.repository — Prisma operations for the devices module.
- *
- * IMPORTANT: Only this file imports Prisma for the devices module.
+ * 1. What this file does:
+ *    Executes database persistence operations for mobile client device registration and token lifecycle.
+ * 2. Overall design:
+ *    Prisma repository layer isolating database queries for the user_devices table with foreign key guards.
+ * 3. Elements in the file:
+ *    - upsertDevice: Registers or updates active mobile devices.
+ *    - getDeviceById: Retrieves device by device_id.
+ *    - deactivateDevice: Marks device as inactive on logout.
+ * 4. Final output of the file:
+ *    Persisted UserDevice entities or database operation results.
  */
 
 const prisma = require('../../config/database');
 
 /**
- * Upsert a device record by client-supplied device_id.
- *
- * If device exists, updates user_id, platform, optional fcm_token,
- * app_version, reactivates (is_active: true), and updates last_seen_at.
- * If device does not exist, creates a new UserDevice record.
+ * 1. The use of function:
+ *    Upserts a device record by client-supplied device_id with safe user foreign key validation.
+ * 2. How does the specific function work:
+ *    Checks if user_id exists in the users table to prevent foreign key violations for business/admin personas,
+ *    then executes Prisma upsert setting platform, optional fcm_token, app_version, and last_seen_at.
+ * 3. Concepts used in the function:
+ *    Foreign key defense, tenant scoping, Prisma upsert.
+ * 4. Places where this function is imported and used:
+ *    Used in devices.service.js registerDevice.
+ * 5. Final output of the function, before and after:
+ *    Before: Throws 500 foreign key constraint violation on non-standard users; After: Persists UserDevice safely.
  *
  * @param {{
  *   device_id: string,
@@ -25,10 +38,21 @@ const prisma = require('../../config/database');
  * @returns {Promise<import('@prisma/client').UserDevice>}
  */
 async function upsertDevice({ device_id, user_id, platform, fcm_token, app_version }) {
+  let validUserId = null;
+  if (user_id) {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: user_id },
+      select: { id: true },
+    });
+    if (existingUser) {
+      validUserId = existingUser.id;
+    }
+  }
+
   return prisma.userDevice.upsert({
     where: { device_id },
     update: {
-      user_id,
+      user_id: validUserId,
       platform,
       ...(fcm_token !== undefined && { fcm_token }),
       ...(app_version !== undefined && { app_version }),
@@ -37,7 +61,7 @@ async function upsertDevice({ device_id, user_id, platform, fcm_token, app_versi
     },
     create: {
       device_id,
-      user_id,
+      user_id: validUserId,
       platform,
       fcm_token: fcm_token ?? null,
       app_version: app_version ?? null,

@@ -195,16 +195,23 @@ async function updateAdminStatus(actor, id, { is_active }) {
 // Business Organizations Management
 // ---------------------------------------------------------------------------
 
-async function listOrganizations({ type, approval_status, page = 1, pageSize = 20 }) {
+async function listOrganizations({ type, approval_status, status, page = 1, pageSize = 20 }) {
   const parsedPage = Math.max(1, parseInt(page, 10) || 1);
   const parsedPageSize = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
   const skip = (parsedPage - 1) * parsedPageSize;
   const take = parsedPageSize;
 
-  const { items, total } = await repo.listOrganizations({ type, approval_status, skip, take });
+  const resolvedApprovalStatus = approval_status || status;
+  const { items, total } = await repo.listOrganizations({ type, approval_status: resolvedApprovalStatus, skip, take });
+  
+  const normalizedItems = (items || []).map((org) => ({
+    ...org,
+    status: org.approval_status,
+  }));
+
   return {
-    items,
-    data: items,
+    items: normalizedItems,
+    data: normalizedItems,
     total,
     pagination: buildPaginationMeta(parsedPage, parsedPageSize, total),
   };
@@ -234,7 +241,10 @@ async function updateOrganizationApproval(actor, id, body = {}) {
     details: { approval_status },
   });
 
-  return updated;
+  return {
+    ...updated,
+    status: updated.approval_status,
+  };
 }
 
 const adminUsersService = {

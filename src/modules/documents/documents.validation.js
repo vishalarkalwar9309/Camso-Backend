@@ -119,10 +119,13 @@ function validateDetailParams(params, query) {
   return { id: paramsResult.value.id, lang: queryResult.value.lang };
 }
 
+const ACCESS_LEVELS = ['PUBLIC', 'DEALER', 'DISTRIBUTOR', 'OEM', 'ADMIN'];
+
 const createDocumentSchema = Joi.object({
   product_id: cuidOptional,
   category_id: cuidOptional,
   document_type: Joi.string().valid(...DOCUMENT_TYPES).required(),
+  access_level: Joi.string().valid(...ACCESS_LEVELS).default('PUBLIC'),
   is_published: Joi.boolean().default(false),
   title: Joi.string().max(255).required(), // English fallback title initially
 });
@@ -131,6 +134,7 @@ const updateDocumentSchema = Joi.object({
   product_id: cuidOptional,
   category_id: cuidOptional,
   document_type: Joi.string().valid(...DOCUMENT_TYPES).optional(),
+  access_level: Joi.string().valid(...ACCESS_LEVELS).optional(),
   is_published: Joi.boolean().optional(),
   title: Joi.string().max(255).optional(), // Default language title update
   translations: Joi.array().items(

@@ -162,11 +162,13 @@ async function adminCreateNotification(body, adminId, auditContext = {}) {
   const { notification_type, product_id, campaign_id, translations } = body;
   if (!notification_type) throw ApiError.validation('notification_type is required.');
 
+  const effectiveAdminId = (!adminId || adminId === 'demo_admin_user') ? 'cmvccz1420001ulvcgggd3s4g' : String(adminId);
+
   const notification = await notificationsRepository.createNotification({
     notification_type,
     product_id: product_id ? String(product_id) : null,
     campaign_id: campaign_id ? String(campaign_id) : null,
-    created_by: adminId ? String(adminId) : null,
+    created_by: effectiveAdminId,
     status: 'DRAFT',
   });
 

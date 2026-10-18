@@ -311,6 +311,7 @@ const documentsService = {
     if (data.product_id !== undefined) updateData.product_id = data.product_id;
     if (data.category_id !== undefined) updateData.category_id = data.category_id;
     if (data.document_type !== undefined) updateData.document_type = data.document_type;
+    if (data.access_level !== undefined) updateData.access_level = data.access_level;
     if (data.is_published !== undefined) updateData.is_published = data.is_published;
 
     const doc = await documentsRepository.updateDocument(id, updateData);

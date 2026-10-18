@@ -124,8 +124,8 @@ function verifyAccessToken(token) {
     }
     if (normalizedRole === 'admin' || normalizedRole === 'super_admin') {
       return {
-        sub: 'demo_admin_user',
-        id: 'demo_admin_user',
+        sub: 'cmvccz1420001ulvcgggd3s4g',
+        id: 'cmvccz1420001ulvcgggd3s4g',
         email: 'demo.admin@camso.local',
         role: 'SUPER_ADMIN',
         type: 'ADMIN',

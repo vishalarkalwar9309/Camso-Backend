@@ -270,6 +270,7 @@ const documentsRepository = {
           product_id: true,
           category_id: true,
           document_type: true,
+          access_level: true,
           is_published: true,
           download_count: true,
           created_at: true,
@@ -303,6 +304,7 @@ const documentsRepository = {
         product_id: true,
         category_id: true,
         document_type: true,
+        access_level: true,
         is_published: true,
         created_at: true,
         updated_at: true,
@@ -327,13 +329,17 @@ const documentsRepository = {
   },
 
   async createDocument(data, prismaClient = prisma) {
+    const createData = {
+      product_id: data.product_id,
+      category_id: data.category_id,
+      document_type: data.document_type,
+      is_published: data.is_published,
+    };
+    if (data.access_level !== undefined) {
+      createData.access_level = data.access_level;
+    }
     return prismaClient.document.create({
-      data: {
-        product_id: data.product_id,
-        category_id: data.category_id,
-        document_type: data.document_type,
-        is_published: data.is_published,
-      },
+      data: createData,
     });
   },
 
