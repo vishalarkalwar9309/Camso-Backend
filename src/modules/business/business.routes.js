@@ -30,6 +30,7 @@ const requireBusinessRole = require('../../core/middleware/requireBusinessRole')
 const { sendSuccess } = require('../../core/utils/ApiResponse');
 const prisma = require('../../config/database');
 const ApiError = require('../../core/utils/ApiError');
+const logger = require('../../core/logger');
 
 const router = Router();
 
@@ -237,6 +238,10 @@ router.get('/oem/documents', requireBusinessRole('OEM_PARTNER'), async (req, res
 
     sendSuccess(res, documents, 200);
   } catch (err) {
+    if (err.code === 'P2022') {
+      logger.warn(`[BusinessRoutes] access_level column missing in database schema (P2022) on ${req.originalUrl}. Failing closed with empty list.`);
+      return sendSuccess(res, [], 200);
+    }
     next(err);
   }
 });
@@ -334,6 +339,10 @@ router.get('/dealer/documents', requireBusinessRole('DEALER', 'DISTRIBUTOR'), as
 
     sendSuccess(res, documents, 200);
   } catch (err) {
+    if (err.code === 'P2022') {
+      logger.warn(`[BusinessRoutes] access_level column missing in database schema (P2022) on ${req.originalUrl}. Failing closed with empty list.`);
+      return sendSuccess(res, [], 200);
+    }
     next(err);
   }
 });
@@ -431,6 +440,10 @@ router.get('/distributor/documents', requireBusinessRole('DISTRIBUTOR'), async (
 
     sendSuccess(res, documents, 200);
   } catch (err) {
+    if (err.code === 'P2022') {
+      logger.warn(`[BusinessRoutes] access_level column missing in database schema (P2022) on ${req.originalUrl}. Failing closed with empty list.`);
+      return sendSuccess(res, [], 200);
+    }
     next(err);
   }
 });

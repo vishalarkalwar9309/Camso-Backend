@@ -393,27 +393,30 @@ const documentsService = {
    * downloadDocument
    *
    * 1. THE USE OF FUNCTION:
-   *    Authorizes and initiates a document download for an authenticated caller, returning
-   *    a valid signed URL or static download link, metadata, and logging telemetry.
+   *    Authorizes and initiates a document download, permitting anonymous downloads for verified
+   *    PUBLIC documents while strictly enforcing authentication, RBAC, and fail-closed schema checks
+   *    for restricted partner, dealer, and admin documents.
    * 2. HOW DOES THE SPECIFIC FUNCTION WORK:
    *    - Fetches the published document record and translates its title.
-   *    - Resolves access level and enforces RBAC (Admin, OEM, Dealer, Distributor, Public).
+   *    - Resolves access level and enforces authentication for non-public documents.
+   *    - Enforces fail-closed schema guard when access_level is absent on unmigrated schemas.
+   *    - Enforces role-based access control (Admin, OEM, Dealer, Distributor) and organization scoping.
    *    - Verifies that target media exists and that physical files on local storage exist on disk.
    *    - Increments document download counter atomically.
    *    - Logs asynchronous non-blocking DOCUMENT_DOWNLOAD telemetry.
    *    - Generates signed Supabase storage URL or fully qualified HTTP download URL.
    * 3. CONCEPTS USED IN THE FUNCTION:
-   *    Fail-closed authorization, multi-tenant RBAC, storage verification, non-blocking telemetry.
+   *    Fail-closed authorization, multi-tenant RBAC, public asset delivery, storage verification, non-blocking telemetry.
    * 4. PLACES WHERE THIS FUNCTION IS IMPORTED AND USED:
    *    Imported in src/modules/documents/documents.controller.js.
    * 5. FINAL OUTPUT OF THE FUNCTION, BEFORE AND AFTER:
-   *    Before: Download payload returned even if file did not exist on local disk.
-   *    After: Verified download payload with real file guarantee or 404 error if file missing.
+   *    Before: Required authentication unconditionally for all downloads, breaking anonymous public downloads.
+   *    After: Verified download payload for authorized public or authenticated role-matched callers, strictly 401/403/404 on violation.
    *
-   * @param {number} id - Document primary key.
+   * @param {number|string} id - Document primary key.
    * @param {string} lang - Requested ISO language code.
-   * @param {object} actor - Authenticated caller principal.
-   * @param {object} req - Express request object.
+   * @param {object|null} actor - Authenticated caller principal or null for anonymous.
+   * @param {object|null} req - Express request object.
    * @returns {Promise<object>} Download metadata payload.
    */
   async downloadDocument(id, lang = 'en', actor = null, req = null) {
@@ -428,12 +431,12 @@ const documentsService = {
     const accessLevel = resolveDocumentAccessLevel(localizedDoc);
     const isPublic = accessLevel === 'PUBLIC';
 
-    // 1. Require authentication for ALL document downloads per tester requirement
-    if (!actor || !actor.id) {
+    // 1. Enforce authentication for non-public documents
+    if (!isPublic && (!actor || !actor.id)) {
       throw ApiError.unauthorized('Authentication required to download this document.', 'UNAUTHORIZED');
     }
 
-    const role = actor.role || (actor.is_guest ? 'GUEST' : 'END_USER');
+    const role = actor?.role || (actor?.is_guest ? 'GUEST' : (actor ? 'END_USER' : null));
     const isSuperOrContentAdmin = ['SUPER_ADMIN', 'CONTENT_ADMIN'].includes(role);
 
     // FAIL-CLOSED SECURITY GUARANTEE:
@@ -515,10 +518,10 @@ const documentsService = {
       if (process.env.NODE_ENV !== 'test' && prisma && prisma.userActivity && typeof prisma.userActivity.create === 'function') {
         await prisma.userActivity.create({
           data: {
-            user_id: isBusinessActor ? null : (actor.is_guest ? null : actor.id),
-            business_user_id: isBusinessActor ? actor.id : null,
-            organization_id: actor.org_id || null,
-            device_id: actor.deviceId || (typeof req?.headers?.['x-device-id'] === 'string' ? req.headers['x-device-id'] : null),
+            user_id: isBusinessActor ? null : (actor?.is_guest ? null : (actor?.id || null)),
+            business_user_id: isBusinessActor ? (actor?.id || null) : null,
+            organization_id: actor?.org_id || null,
+            device_id: actor?.deviceId || (typeof req?.headers?.['x-device-id'] === 'string' ? req.headers['x-device-id'] : null),
             activity_type: 'DOCUMENT_DOWNLOAD',
             entity_type: 'DOCUMENT',
             entity_id: id,

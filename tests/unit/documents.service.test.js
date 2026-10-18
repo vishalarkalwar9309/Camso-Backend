@@ -3,14 +3,14 @@
 /**
  * 1. What this file does:
  *    Unit tests for the Documents service module, verifying RBAC enforcement,
- *    mandatory authentication for downloads, role-based document access boundaries,
- *    and admin document confidentiality.
+ *    anonymous public document download access, mandatory authentication for restricted downloads,
+ *    role-based document access boundaries, and admin document confidentiality.
  * 2. Overall design:
  *    Mocks documents repository, translation repository, and audit service,
  *    exercising downloadDocument, listPublishedDocuments, and getPublishedDocumentById.
  * 3. Elements in the file:
  *    - describe('Documents Service (Unit Tests)'): Main test suite.
- *    - downloadDocument tests: Validates 401 for anonymous, 403 for unauthorized roles, 200 for authorized.
+ *    - downloadDocument tests: Validates 401 for anonymous on restricted docs, 200 for anonymous on public docs, 403 for unauthorized roles, 200 for authorized.
  *    - listPublishedDocuments tests: Validates exclusion of ADMIN documents from public browse.
  *    - getPublishedDocumentById tests: Validates 404 for admin documents when accessed by end-users.
  * 4. Final output of the file:
@@ -128,15 +128,26 @@ describe('Documents Service (Unit Tests)', () => {
       ],
     };
 
-    it('rejects unauthenticated/anonymous download with 401 UNAUTHORIZED', async () => {
-      documentsRepository.findPublishedDocumentById.mockResolvedValue(publicDoc);
+    it('rejects unauthenticated/anonymous download for restricted document with 401 UNAUTHORIZED', async () => {
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(dealerDoc);
 
       await expect(
-        documentsService.downloadDocument('doc-pub-1', 'en', null)
+        documentsService.downloadDocument('doc-dlr-1', 'en', null)
       ).rejects.toMatchObject({
         statusCode: 401,
         message: expect.stringMatching(/Authentication required/),
       });
+    });
+
+    it('allows anonymous caller to download a PUBLIC document', async () => {
+      documentsRepository.findPublishedDocumentById.mockResolvedValue(publicDoc);
+      documentsRepository.incrementDownloadCount.mockResolvedValue();
+
+      const result = await documentsService.downloadDocument('doc-pub-1', 'en', null);
+
+      expect(result).toBeDefined();
+      expect(result.download_url).toBe('https://storage.supabase.co/camso/cat.pdf');
+      expect(documentsRepository.incrementDownloadCount).toHaveBeenCalledWith('doc-pub-1');
     });
 
     it('allows authenticated registered end user to download a PUBLIC document', async () => {

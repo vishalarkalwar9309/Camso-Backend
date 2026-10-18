@@ -238,9 +238,9 @@ describe('CAMSO Backend — Round 3 Backend Persistence, Documents & Data Readin
   // ISSUE 5: Document Downloads Physical File Existence Validation
   // =========================================================================
   describe('Issue 5: Document Downloads Physical File Existence Validation', () => {
-    test('throws 401 when download is attempted without authentication', async () => {
+    test('throws 401 when download is attempted without authentication on restricted document', async () => {
       const docRepoSpy = jest.spyOn(require('../../src/modules/documents/documents.repository'), 'findPublishedDocumentById')
-        .mockResolvedValue({ id: 1, access_level: 'PUBLIC', is_published: true });
+        .mockResolvedValue({ id: 1, access_level: 'DEALER', is_published: true });
 
       await expect(
         documentsService.downloadDocument(1, 'en', null)

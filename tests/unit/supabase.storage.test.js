@@ -86,10 +86,10 @@ describe('Supabase Storage Integration & Document Delivery Tests', () => {
       jest.spyOn(documentsRepository, 'findPublishedDocumentById').mockResolvedValue(mockDoc);
       jest.spyOn(documentsRepository, 'incrementDownloadCount').mockResolvedValue({ ...mockDoc, download_count: 6 });
 
-      // Unauthenticated access must be rejected with 401
-      await expect(documentsService.downloadDocument('doc_pub_1', 'en', null)).rejects.toThrow(
-        /Authentication required to download this document/
-      );
+      // Anonymous public download is permitted
+      const anonRes = await documentsService.downloadDocument('doc_pub_1', 'en', null);
+      expect(anonRes.document_id).toBe('doc_pub_1');
+      expect(anonRes.download_url).toBe('https://example.com/catalogue.pdf');
 
       // Authenticated guest or user is permitted
       const guestActor = { id: 'guest_1', is_guest: true, role: 'GUEST' };

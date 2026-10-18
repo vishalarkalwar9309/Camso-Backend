@@ -1,17 +1,22 @@
 /**
  * tests/integration/adminDays910.test.js
  *
- * Integration tests for Days 9–10 scope:
- *   - Admin Dealers CRUD (GET list, GET/:id, POST, PATCH)
- *   - Admin Feedback READ + CSV Export
- *   - Admin Notifications CRUD
- *   - Admin Campaigns CRUD + /send
- *   - Admin Users CRUD (SUPER_ADMIN only)
- *
- * Architecture:
- *   Uses supertest + real Prisma/DB (same pattern as adminCms.test.js).
- *   Firebase Admin SDK is mocked so FCM send tests don't need real credentials.
- *   All role-based access control is verified for every write endpoint.
+ * 1. WHAT THIS FILE DOES:
+ *    Executes integration tests for Days 9–10 scope including Admin Dealers CRUD,
+ *    Feedback read and CSV export, Notifications CRUD, Campaigns CRUD and send,
+ *    and Admin Users lifecycle governance (SUPER_ADMIN only).
+ * 2. OVERALL DESIGN:
+ *    Uses Supertest against the live Express application backed by Prisma PostgreSQL database.
+ *    Mocks Firebase Admin messaging to verify push campaign dispatch without external network calls.
+ *    Validates RBAC permissions, input validation, and account deactivation rejections.
+ * 3. ELEMENTS IN THE FILE:
+ *    - Admin Dealers CRUD test suite
+ *    - Admin Feedback READ & CSV Export test suite
+ *    - Admin Notifications CRUD test suite
+ *    - Admin Campaigns CRUD & /send test suite
+ *    - Admin Users Management & Inactive Admin rejection test suite
+ * 4. FINAL OUTPUT OF THE FILE:
+ *    Jest test execution verifying Days 9–10 admin endpoints and RBAC boundaries.
  */
 
 const request = require('supertest');
@@ -446,7 +451,8 @@ describe('Days 9–10 Admin Integration Tests', () => {
       await prisma.adminUser.update({ where: { id: createdAdminId }, data: { is_active: false } });
       const inactiveToken = tokenService.generateTokenPair({ id: createdAdminId, type: 'ADMIN', role: 'MARKETING' }).accessToken;
       const res = await request(app).get('/api/v1/admin/admin-users').set('Authorization', `Bearer ${inactiveToken}`);
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(403);
+      expect(res.body.error.message).toMatch(/inactive/i);
     });
   });
 });

@@ -3,23 +3,28 @@
 /**
  * tests/integration/publicContent.test.js
  *
- * WHAT THIS FILE DOES:
- *   Integration test suite for public content read endpoints:
- *   - GET /api/v1/documents
- *   - GET /api/v1/documents/:id
- *   - GET /api/v1/testimonials
- *   - GET /api/v1/faqs
- *   - Health & route auto-mounting verification
- *
- * OVERALL DESIGN:
- *   Uses supertest against the Express app instance returned by createApp().
- *   Validates sorting (default, ascending, descending, prefix minus, colon, invalid fallback),
- *   parameter alias normalization (?product=, ?category=, ?type=),
- *   unpublished exclusion, pagination envelopes, localized document file resolution,
- *   and 404 / 422 error cases.
- *
- * FINAL OUTPUT:
- *   Jest integration test suite execution output.
+ * 1. WHAT THIS FILE DOES:
+ *    Integration test suite for public content read endpoints:
+ *    - GET /api/v1/documents
+ *    - GET /api/v1/documents/:id
+ *    - GET /api/v1/documents/:id/download
+ *    - GET /api/v1/testimonials
+ *    - GET /api/v1/faqs
+ *    - Health & route auto-mounting verification
+ * 2. OVERALL DESIGN:
+ *    Uses Supertest against the Express app instance returned by createApp().
+ *    Validates sorting (default, ascending, descending, prefix minus, colon notation),
+ *    parameter alias normalization (?product=, ?category=, ?type=),
+ *    unpublished exclusion, pagination envelopes, localized document file resolution,
+ *    and multi-tenant RBAC / download policy validation (401, 403, 404, 422).
+ * 3. ELEMENTS IN THE FILE:
+ *    - Route Auto-Mounting & Infrastructure test suite
+ *    - GET /api/v1/documents test suite
+ *    - GET /api/v1/documents/:id detail and download test suite
+ *    - GET /api/v1/testimonials test suite
+ *    - GET /api/v1/faqs test suite
+ * 4. FINAL OUTPUT OF THE FILE:
+ *    Jest integration test suite execution report validating public content read APIs.
  */
 
 const request = require('supertest');
@@ -126,6 +131,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
         product_id: 'cuid_product_0000000010',
         category_id: 'cuid_category_000000002',
         document_type: 'CATALOGUE',
+        access_level: 'PUBLIC',
         created_at: new Date(),
         updated_at: new Date(),
         files: [
@@ -152,6 +158,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
         product_id: 'cuid_product_0000000010',
         category_id: 'cuid_category_000000002',
         document_type: 'CATALOGUE',
+        access_level: 'PUBLIC',
         created_at: new Date(),
         updated_at: new Date(),
         files: [
@@ -173,6 +180,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
         product_id: 'cuid_product_0000000010',
         category_id: 'cuid_category_000000002',
         document_type: 'MANUAL',
+        access_level: 'PUBLIC',
         created_at: new Date(),
         updated_at: new Date(),
         files: [
@@ -204,6 +212,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
       const mockDoc = {
         id: 'cuid_document_0000000001',
         document_type: 'MANUAL',
+        access_level: 'PUBLIC',
         download_count: 5,
         files: [
           { language_code: 'en', media_asset: { id: 'm1', url: 'https://storage.googleapis.com/test/doc.pdf', file_name: 'doc.pdf', mime_type: 'application/pdf', file_size_bytes: 1024 } },
@@ -231,6 +240,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
       const mockRestrictedDoc = {
         id: 'cuid_doc_tech_01',
         document_type: 'TECHNICAL_GUIDE',
+        access_level: 'DEALER',
         files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf' } }],
       };
       documentsRepository.findPublishedDocumentById.mockResolvedValue(mockRestrictedDoc);
@@ -244,6 +254,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
       const mockRestrictedDoc = {
         id: 'cuid_doc_tech_01',
         document_type: 'TECHNICAL_GUIDE',
+        access_level: 'DEALER',
         files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf' } }],
       };
       documentsRepository.findPublishedDocumentById.mockResolvedValue(mockRestrictedDoc);
@@ -263,6 +274,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
       const mockRestrictedDoc = {
         id: 'cuid_doc_tech_01',
         document_type: 'TECHNICAL_GUIDE',
+        access_level: 'RESTRICTED',
         files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf' } }],
       };
       documentsRepository.findPublishedDocumentById.mockResolvedValue(mockRestrictedDoc);
@@ -282,6 +294,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
       const mockRestrictedDoc = {
         id: 'cuid_doc_tech_01',
         document_type: 'TECHNICAL_GUIDE',
+        access_level: 'DEALER',
         download_count: 10,
         files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf', file_name: 'tech.pdf' } }],
       };
@@ -303,6 +316,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
       const mockRestrictedDoc = {
         id: 'cuid_doc_tech_01',
         document_type: 'TECHNICAL_GUIDE',
+        access_level: 'DEALER',
         organization_id: 'org_assigned_to_doc',
         files: [{ language_code: 'en', media_asset: { id: 'm2', url: 'https://storage.googleapis.com/test/tech.pdf' } }],
       };
@@ -323,6 +337,7 @@ describe('Public Content Read APIs Comprehensive Test Suite', () => {
       const mockEmptyDoc = {
         id: 'cuid_doc_pub_empty',
         document_type: 'CATALOGUE',
+        access_level: 'PUBLIC',
         files: [],
       };
       documentsRepository.findPublishedDocumentById.mockResolvedValue(mockEmptyDoc);
