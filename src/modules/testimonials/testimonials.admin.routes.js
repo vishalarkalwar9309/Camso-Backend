@@ -19,4 +19,7 @@ router.post('/', requireRole('CONTENT_ADMIN', 'SUPER_ADMIN'), asyncHandler(testi
 // PATCH /api/v1/admin/testimonials/:id
 router.patch('/:id', requireRole('CONTENT_ADMIN', 'SUPER_ADMIN'), asyncHandler(testimonialsController.adminUpdate));
 
+// DELETE /api/v1/admin/testimonials/:id
+router.delete('/:id', requireRole('CONTENT_ADMIN', 'SUPER_ADMIN'), asyncHandler(testimonialsController.adminDelete));
+
 module.exports = router;

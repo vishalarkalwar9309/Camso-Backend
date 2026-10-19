@@ -61,6 +61,11 @@ const updateOrganizationApproval = asyncHandler(async (req, res) => {
   ApiResponse.sendSuccess(res, result, 200);
 });
 
+const revokeSessions = asyncHandler(async (req, res) => {
+  const result = await service.revokeAdminSessions(req.user || req.admin, req.params.id);
+  ApiResponse.sendSuccess(res, result, 200);
+});
+
 const adminUsersController = {
   createAdmin,
   create: createAdmin,
@@ -71,6 +76,7 @@ const adminUsersController = {
   updateAdmin,
   update: updateAdmin,
   updateAdminStatus,
+  revokeSessions,
   listOrganizations,
   updateOrganizationApproval,
 };

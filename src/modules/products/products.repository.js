@@ -207,13 +207,46 @@ async function createProduct(productData, specifications = []) {
 }
 
 /**
- * Update an existing product.
+ * Update an existing product, with optional atomic replacement of specifications/dimensions.
  *
  * @param {string} id
  * @param {object} data
+ * @param {Array<object>|null} [specifications]
  * @returns {Promise<import('@prisma/client').Product>}
  */
-async function updateProduct(id, data) {
+async function updateProduct(id, data, specifications = null) {
+  if (Array.isArray(specifications)) {
+    return prisma.$transaction(async (tx) => {
+      await tx.productSpecification.deleteMany({
+        where: { product_id: id },
+      });
+      if (specifications.length > 0) {
+        await tx.productSpecification.createMany({
+          data: specifications.map((s) => ({
+            product_id: id,
+            spec_type: s.spec_type || 'SPECIFICATION',
+            spec_key: s.spec_key,
+            spec_value: s.spec_value,
+            unit: s.unit || null,
+            is_filterable: Boolean(s.is_filterable),
+            sort_order: s.sort_order || 0,
+          })),
+        });
+      }
+      return tx.product.update({
+        where: { id },
+        data,
+        include: {
+          category: {
+            select: { id: true, name: true, slug: true },
+          },
+          images: true,
+          specifications: true,
+        },
+      });
+    });
+  }
+
   return prisma.product.update({
     where: { id },
     data,

@@ -1,34 +1,28 @@
 /**
  * admin-dashboard/src/pages/DocumentsManager.jsx
  *
- * WHAT THIS FILE DOES:
- *   Provides the administrative management interface for CAMSO support documents in the
- *   official Blue & White corporate theme. Enables administrators to view paginated documents,
- *   filter by type and publish status, toggle publication, create new documents, and upload
- *   multi-lingual PDF / specification files.
- *
- * OVERALL DESIGN:
- *   React functional component utilizing hooks (useState, useEffect, useCallback).
- *   Communicates with backend routes:
- *     - GET   /api/v1/admin/documents
- *     - POST  /api/v1/admin/documents
- *     - PATCH /api/v1/admin/documents/:id
- *     - POST  /api/v1/admin/documents/:id/files
- *   Styled with crisp white cards, Camso Blue buttons, and high-contrast tables.
- *
- * ELEMENTS IN THIS FILE:
- *   - DOCUMENT_TYPES constant (CATALOGUE, BROCHURE, MANUAL, TECHNICAL_GUIDE, BULLETIN, WARRANTY, VIDEO)
- *   - DocumentsManager component
- *     - Filters: search, documentType, isPublished, page
- *     - Modals: isCreateOpen, isUploadOpen, selectedDoc
- *     - Action handlers: fetchDocuments, handleTogglePublish, handleCreateDoc, handleUploadFile
- *
- * FINAL OUTPUT OF THE FILE:
- *   Exports the default React component DocumentsManager for tab rendering in App.jsx.
+ * 1. What this file does:
+ *    Administrative support documents CMS for CAMSO engineering catalogues, manuals, and bulletins.
+ *    Enables administrators to view documents, inspect attached file metadata (filename, size, MIME type,
+ *    timestamps), upload multi-lingual files, execute versioned file replacements, and manage publication state.
+ * 2. Overall design:
+ *    Connects to /api/v1/admin/documents and /api/v1/admin/documents/:id/files.
+ *    Provides explicit "Replace File (New Version)" modal displaying current vs proposed file metadata,
+ *    and utilizes the standardized 5-button Pagination component.
+ * 3. Elements in the file:
+ *    - DocumentsManager component.
+ *    - Create Document modal dialog.
+ *    - Upload Attachment modal dialog.
+ *    - Replace File (New Version) modal dialog.
+ *    - Responsive document table with file metadata badges and 5-button pagination.
+ * 4. Final output of the file:
+ *    Exports default React component DocumentsManager for tab rendering in App.jsx.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import Pagination from '../components/Pagination';
 
 const DOCUMENT_TYPES = [
   'CATALOGUE',
@@ -41,30 +35,48 @@ const DOCUMENT_TYPES = [
 ];
 
 /**
+ * formatBytes
+ *
+ * 1. The use of function:
+ *    Formats raw file size bytes into human-readable KB or MB strings.
+ * 2. How does the specific function work:
+ *    Divides bytes by 1024 / 1048576 with appropriate precision.
+ * 3. Concepts used in the function:
+ *    Byte calculation.
+ * 4. Places where this function is imported and used:
+ *    Helper in DocumentsManager.
+ * 5. Final output of the function, before and after:
+ *    Returns formatted string (e.g. "4.2 MB").
+ */
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+/**
  * DocumentsManager
  *
- * USE OF FUNCTION:
- *   Main React view component for managing support documents in CAMSO Blue & White theme.
+ * 1. The use of function:
+ *    Renders the Support Documents CMS in the CAMSO Admin Console.
+ * 2. How does the specific function work:
+ *    Queries GET /admin/documents with type, publish status, and search filters.
+ *    Displays file metadata, executes status toggling, handles new document creation,
+ *    and supports file replacement with version history preservation.
+ * 3. Concepts used in the function:
+ *    Multipart FormData uploads, file replacement validation, server-side pagination.
+ * 4. Places where this function is imported and used:
+ *    Imported in admin-dashboard/src/App.jsx.
+ * 5. Final output of the function, before and after:
+ *    Before: Document table lacking file metadata and version replacement workflows.
+ *    After: Complete document and file versioning manager with metadata display.
  *
- * HOW DOES THE SPECIFIC FUNCTION WORK:
- *   1. Queries GET /api/v1/admin/documents with search, type, and publish filters.
- *   2. Displays documents in a responsive table with status badges and download counts.
- *   3. Offers toggle publication via PATCH /api/v1/admin/documents/:id.
- *   4. Enables modal-driven creation (POST) and multi-lingual attachment upload (multipart).
- *
- * CONCEPTS USED IN THE FUNCTION:
- *   - React state and memoized fetch lifecycle.
- *   - Standardized API envelope unwrapping.
- *   - Camso Blue primary buttons and high-contrast data table layout.
- *
- * PLACES WHERE THIS FUNCTION IS IMPORTED AND USED:
- *   Imported by admin-dashboard/src/App.jsx.
- *
- * FINAL OUTPUT OF THE FUNCTION:
- *   Before: Previous red-accented view.
- *   After: Branded Blue & White support documents management console.
+ * @returns {React.ReactElement}
  */
 export default function DocumentsManager() {
+  const { canWrite } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
@@ -82,12 +94,19 @@ export default function DocumentsManager() {
   const [newPublished, setNewPublished] = useState(false);
   const [createSubmitting, setCreateSubmitting] = useState(false);
 
-  // Upload Modal
+  // Upload Attachment Modal
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [targetDoc, setTargetDoc] = useState(null);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadLang, setUploadLang] = useState('en');
   const [uploadSubmitting, setUploadSubmitting] = useState(false);
+
+  // Replace File Modal
+  const [isReplaceOpen, setIsReplaceOpen] = useState(false);
+  const [replaceDoc, setReplaceDoc] = useState(null);
+  const [currentFileMeta, setCurrentFileMeta] = useState(null);
+  const [replacementFile, setReplacementFile] = useState(null);
+  const [replaceSubmitting, setReplaceSubmitting] = useState(false);
 
   const fetchDocuments = useCallback(async (page = 1) => {
     try {
@@ -99,12 +118,14 @@ export default function DocumentsManager() {
       if (search.trim()) params.search = search.trim();
 
       const res = await api.get('/admin/documents', params);
-      setDocuments(res.data || []);
-      if (res.meta?.pagination) {
-        setPagination(res.meta.pagination);
+      const raw = res.data || res.items || res;
+      const list = Array.isArray(raw) ? raw : (raw?.items || raw?.documents || []);
+      setDocuments(list);
+      if (res.meta?.pagination || res.pagination) {
+        setPagination(res.meta?.pagination || res.pagination);
       }
     } catch (err) {
-      setError(err.message || 'Failed to load documents');
+      setError(err.message || 'Failed to load documents.');
     } finally {
       setLoading(false);
     }
@@ -115,6 +136,7 @@ export default function DocumentsManager() {
   }, [fetchDocuments]);
 
   const handleTogglePublish = async (doc) => {
+    if (!canWrite) return;
     try {
       const updatedStatus = !doc.is_published;
       await api.patch(`/admin/documents/${doc.id}`, { is_published: updatedStatus });
@@ -169,23 +191,56 @@ export default function DocumentsManager() {
     }
   };
 
+  const handleOpenReplace = (doc) => {
+    setReplaceDoc(doc);
+    const primaryFile = doc.files?.[0] || null;
+    setCurrentFileMeta(primaryFile);
+    setReplacementFile(null);
+    setIsReplaceOpen(true);
+  };
+
+  const handleConfirmReplace = async (e) => {
+    e.preventDefault();
+    if (!replacementFile || !replaceDoc) return;
+    try {
+      setReplaceSubmitting(true);
+      const formData = new FormData();
+      formData.append('file', replacementFile);
+      formData.append('language_code', currentFileMeta?.language_code || 'en');
+
+      await api.upload(`/admin/documents/${replaceDoc.id}/files`, formData);
+      setIsReplaceOpen(false);
+      setReplacementFile(null);
+      setReplaceDoc(null);
+      fetchDocuments(pagination.page);
+    } catch (err) {
+      alert(`Replacement failed: ${err.message}`);
+    } finally {
+      setReplaceSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header & Actions */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Support Documents CMS</h2>
-          <p className="text-sm text-slate-500 font-normal mt-0.5">Manage catalogues, service manuals, warranties, and file attachments</p>
+          <p className="text-sm text-slate-500 font-normal mt-0.5">
+            Manage technical service manuals, brochures, warranties, file versions, and language attachments
+          </p>
         </div>
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-sm font-bold shadow-sm shadow-blue-900/20 transition"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
-          Add Document
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-sm font-bold shadow-sm shadow-blue-900/20 transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Document
+          </button>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -231,87 +286,112 @@ export default function DocumentsManager() {
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3">Title & ID</th>
+                  <th className="px-4 py-3">Document Title & ID</th>
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Downloads</th>
-                  <th className="px-4 py-3">Files</th>
+                  <th className="px-4 py-3">Active File & Metadata</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {documents.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-blue-50/30 transition">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{doc.title || 'Untitled Document'}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{doc.id}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-block px-2.5 py-0.5 text-xs font-semibold rounded bg-blue-50 text-[#0055b8] border border-blue-200">
-                        {doc.document_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleTogglePublish(doc)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
-                          doc.is_published
-                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${doc.is_published ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                        {doc.is_published ? 'Published' : 'Draft'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 font-bold text-[#0055b8]">
-                      {doc.download_count ?? 0}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">
-                      {doc.files ? `${doc.files.length} attached` : '0 files'}
-                    </td>
-                    <td className="px-4 py-3 text-right space-x-2">
-                      <button
-                        onClick={() => {
-                          setTargetDoc(doc);
-                          setIsUploadOpen(true);
-                        }}
-                        className="px-3 py-1 text-xs font-semibold text-[#0055b8] hover:bg-blue-50 rounded border border-blue-200 transition"
-                      >
-                        Upload File
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {documents.map((doc) => {
+                  const activeFile = doc.files?.[0] || null;
+                  const asset = activeFile?.media_asset || activeFile;
+                  return (
+                    <tr key={doc.id} className="hover:bg-blue-50/30 transition">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-900">{doc.title || 'Untitled Document'}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{doc.id}</div>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <span className="inline-block px-2.5 py-0.5 text-xs font-semibold rounded bg-blue-50 text-[#0055b8] border border-blue-200">
+                          {doc.document_type}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleTogglePublish(doc)}
+                          disabled={!canWrite}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
+                            doc.is_published
+                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                          } disabled:opacity-50`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${doc.is_published ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                          {doc.is_published ? 'Published' : 'Draft'}
+                        </button>
+                      </td>
+
+                      <td className="px-4 py-3 font-bold text-[#0055b8]">
+                        {doc.download_count ?? 0}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {activeFile ? (
+                          <div className="space-y-0.5">
+                            <div className="font-medium text-slate-900 text-xs truncate max-w-[200px]" title={asset?.filename || 'File'}>
+                              {asset?.original_filename || asset?.filename || 'Active Attachment'}
+                            </div>
+                            <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                              <span>{formatBytes(asset?.size_bytes)}</span>
+                              <span>&bull;</span>
+                              <span className="uppercase font-mono">{activeFile.language_code || 'en'}</span>
+                              {asset?.mime_type && (
+                                <>
+                                  <span>&bull;</span>
+                                  <span>{asset.mime_type.split('/')[1] || asset.mime_type}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-amber-600 font-medium italic">No file attached</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 text-right space-x-2">
+                        {canWrite && (
+                          <>
+                            {activeFile ? (
+                              <button
+                                onClick={() => handleOpenReplace(doc)}
+                                className="px-2.5 py-1 text-xs font-semibold text-[#0055b8] hover:bg-blue-50 rounded border border-blue-200 transition"
+                              >
+                                Replace File
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setTargetDoc(doc);
+                                  setIsUploadOpen(true);
+                                }}
+                                className="px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 rounded border border-emerald-200 transition"
+                              >
+                                Upload File
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* Pagination Footer */}
-        {pagination.totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-            <div>
-              Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} items)
-            </div>
-            <div className="flex gap-1">
-              <button
-                disabled={pagination.page <= 1}
-                onClick={() => fetchDocuments(pagination.page - 1)}
-                className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <button
-                disabled={pagination.page >= pagination.totalPages}
-                onClick={() => fetchDocuments(pagination.page + 1)}
-                className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          pageSize={pagination.pageSize}
+          onPageChange={(newPage) => fetchDocuments(newPage)}
+        />
       </div>
 
       {/* Create Document Modal */}
@@ -321,7 +401,7 @@ export default function DocumentsManager() {
             <h3 className="text-lg font-bold text-slate-900">Add New Document</h3>
             <form onSubmit={handleCreateDocument} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Title</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Title *</label>
                 <input
                   type="text"
                   required
@@ -331,8 +411,9 @@ export default function DocumentsManager() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0055b8] outline-none"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Document Type</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Document Type *</label>
                 <select
                   value={newType}
                   onChange={(e) => setNewType(e.target.value)}
@@ -343,6 +424,7 @@ export default function DocumentsManager() {
                   ))}
                 </select>
               </div>
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -351,22 +433,23 @@ export default function DocumentsManager() {
                   onChange={(e) => setNewPublished(e.target.checked)}
                   className="w-4 h-4 text-[#0055b8] rounded"
                 />
-                <label htmlFor="publishedCheck" className="text-sm text-slate-700 font-medium">Publish immediately to app</label>
+                <label htmlFor="publishedCheck" className="text-sm text-slate-700 font-medium">Published</label>
               </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createSubmitting}
-                  className="px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-sm font-bold disabled:opacity-50"
+                  className="px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-sm font-bold disabled:opacity-50 transition"
                 >
-                  {createSubmitting ? 'Saving...' : 'Create Document'}
+                  {createSubmitting ? 'Creating...' : 'Create Document'}
                 </button>
               </div>
             </form>
@@ -374,47 +457,119 @@ export default function DocumentsManager() {
         </div>
       )}
 
-      {/* Upload File Modal */}
+      {/* Upload Attachment Modal */}
       {isUploadOpen && targetDoc && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-lg font-bold text-slate-900">Upload Attachment</h3>
-            <p className="text-xs text-slate-500">Document: <span className="font-semibold text-slate-800">{targetDoc.title}</span></p>
+            <p className="text-xs text-slate-500">
+              Attach technical PDF or brochure to: <strong>{targetDoc.title}</strong>
+            </p>
+
             <form onSubmit={handleUploadAttachment} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Language Code</label>
-                <input
-                  type="text"
-                  required
+                <select
                   value={uploadLang}
                   onChange={(e) => setUploadLang(e.target.value)}
-                  placeholder="en, fr, de, es..."
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0055b8] outline-none"
-                />
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+                >
+                  <option value="en">English (en)</option>
+                  <option value="fr">French (fr)</option>
+                  <option value="es">Spanish (es)</option>
+                  <option value="de">German (de)</option>
+                </select>
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Select File (PDF / Doc / Image)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">File Asset</label>
                 <input
                   type="file"
                   required
-                  onChange={(e) => setUploadFile(e.target.files[0])}
-                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-[#0055b8] hover:file:bg-blue-100"
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                  onChange={(e) => setUploadFile(e.target.files[0] || null)}
+                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-[#0055b8] hover:file:bg-blue-100"
                 />
               </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsUploadOpen(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
+                  onClick={() => {
+                    setIsUploadOpen(false);
+                    setTargetDoc(null);
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={uploadSubmitting}
-                  className="px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-sm font-bold disabled:opacity-50"
+                  disabled={uploadSubmitting || !uploadFile}
+                  className="px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-sm font-bold disabled:opacity-50 transition"
                 >
-                  {uploadSubmitting ? 'Uploading...' : 'Upload Attachment'}
+                  {uploadSubmitting ? 'Uploading...' : 'Upload File'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Replace File (New Version) Modal */}
+      {isReplaceOpen && replaceDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-bold text-slate-900">Replace File (New Version)</h3>
+            <p className="text-xs text-slate-500">
+              Replacing active file version for: <strong>{replaceDoc.title}</strong>
+            </p>
+
+            {currentFileMeta && (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Current Active Version</span>
+                <div className="font-semibold text-slate-800 truncate">
+                  {currentFileMeta.media_asset?.original_filename || currentFileMeta.media_asset?.filename || 'Existing attachment'}
+                </div>
+                <div className="text-slate-500 text-[11px]">
+                  Size: {formatBytes(currentFileMeta.media_asset?.size_bytes)} &bull; Language: {currentFileMeta.language_code || 'en'}
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmReplace} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Select Replacement File *</label>
+                <input
+                  type="file"
+                  required
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                  onChange={(e) => setReplacementFile(e.target.files[0] || null)}
+                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-[#0055b8] hover:file:bg-blue-100"
+                />
+              </div>
+
+              <div className="p-2.5 bg-blue-50/60 rounded-lg text-[11px] text-[#0055b8]">
+                Note: The new file will become the active download asset immediately. Previous version metadata remains retained in audit logs.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsReplaceOpen(false);
+                    setReplaceDoc(null);
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={replaceSubmitting || !replacementFile}
+                  className="px-4 py-2 bg-[#0055b8] hover:bg-[#004394] text-white rounded-lg text-sm font-bold disabled:opacity-50 transition"
+                >
+                  {replaceSubmitting ? 'Replacing...' : 'Upload Replacement'}
                 </button>
               </div>
             </form>

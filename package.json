@@ -13,7 +13,7 @@
     "dev": "nodemon src/server.js",
     "test": "jest --forceExit",
     "test:unit": "jest tests/unit --forceExit",
-    "test:integration": "jest tests/integration --forceExit",
+    "test:integration": "jest tests/integration --runInBand --forceExit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",

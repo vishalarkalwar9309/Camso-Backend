@@ -2,19 +2,21 @@
  * admin-dashboard/src/context/AuthContext.jsx
  *
  * WHAT THIS FILE DOES:
- *   Provides global authentication and session state for the CAMSO Admin CMS Dashboard.
- *   Manages the JWT access token, administrator profile, RBAC role, login, and logout.
- *   Listens for 401 Unauthorized window events to auto-expire stale sessions.
+ *   Provides global authentication state, token persistence, and role-based permissions
+ *   for the unified CAMSO Admin & Super Admin Web Application.
+ *   Enforces fail-closed authentication by connecting exclusively to the backend API
+ *   and listening for authorization invalidation events without fabricated mock credentials.
  *
  * OVERALL DESIGN:
  *   React Context API provider (AuthProvider) with custom consumer hook (useAuth).
- *   Integrates with localStorage via client.js helpers and calls POST /api/v1/admin-auth/login.
- *   Provides seamless mock fallback in local developer environments when standalone.
+ *   Authenticates credentials against POST /api/v1/admin-auth/login.
+ *   Persists JWT tokens and admin user profiles in browser localStorage.
+ *   Exposes role identification and write-permission predicates.
  *
  * ELEMENTS IN THIS FILE:
- *   - AuthContext: React context instance
- *   - AuthProvider: Context provider component
- *   - useAuth: Custom hook for consuming auth context
+ *   - AuthContext: React context instance.
+ *   - AuthProvider: Provider component managing token state, role state, login, and logout.
+ *   - useAuth: Consumer hook for accessing authentication state and helpers.
  *
  * FINAL OUTPUT OF THE FILE:
  *   Exports AuthProvider component and useAuth hook.
@@ -25,27 +27,36 @@ import { getAuthToken, setAuthToken, getStoredUser, setStoredUser, api } from '.
 
 const AuthContext = createContext(null);
 
+const RECOGNIZED_ADMIN_ROLES = ['CONTENT_ADMIN', 'MARKETING', 'VIEWER'];
+const SUPER_ADMIN_ROLE = 'SUPER_ADMIN';
+
 /**
  * AuthProvider
  *
  * USE OF FUNCTION:
- *   Wraps application components with authentication state and session methods.
+ *   Wraps application components with authenticated session state, verified role claims,
+ *   and administrative login/logout methods.
  *
  * HOW DOES THE SPECIFIC FUNCTION WORK:
- *   1. Initializes token and user from localStorage.
- *   2. Attaches 'camso:unauthorized' event listener to clear session upon 401 API responses.
- *   3. Exposes login() method sending credentials to POST /admin-auth/login.
- *   4. Exposes logout() method clearing tokens and resetting state.
+ *   1. Reads persisted access token and user metadata from localStorage on startup.
+ *   2. Attaches a window listener for 'camso:unauthorized' to immediately purge sessions on 401s.
+ *   3. Exposes login(email, password) which posts to the real /admin-auth/login endpoint.
+ *      Throws the exact backend error upon failure without fabricating mock tokens.
+ *   4. Exposes logout() which purges tokens and user state.
+ *   5. Computes role predicates (isSuperAdmin, isAdminRole, canWrite).
  *
  * CONCEPTS USED IN THE FUNCTION:
- *   - React Context API, custom event dispatching, persistent token storage.
+ *   - React Context API, custom event pub-sub, secure JWT lifecycle, RBAC predicates.
  *
  * PLACES WHERE THIS FUNCTION IS IMPORTED AND USED:
  *   Imported in admin-dashboard/src/App.jsx.
  *
  * FINAL OUTPUT OF THE FUNCTION:
- *   Before: Raw React child elements.
- *   After: Rendered AuthContext.Provider supplying session context to children.
+ *   Before: Unauthenticated context wrapper.
+ *   After: Rendered AuthContext.Provider supplying session context and role predicates.
+ *
+ * @param {object} props - React props containing children.
+ * @returns {React.ReactElement}
  */
 export function AuthProvider({ children }) {
   const [token, setTokenState] = useState(getAuthToken());
@@ -54,6 +65,8 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const handleUnauthorized = () => {
+      setAuthToken(null);
+      setStoredUser(null);
       setTokenState('');
       setUserState(null);
     };
@@ -64,30 +77,24 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      let res;
-      try {
-        // First try the unified admin-auth endpoint
-        res = await api.post('/admin-auth/login', { email, password });
-      } catch (err) {
-        // Fallback demo/mock for local test environment if admin-auth is unmounted
-        if (email && password) {
-          res = {
-            data: {
-              accessToken: 'mock_superadmin_cuid_jwt_token',
-              user: {
-                id: 'clh9200000000000000000000',
-                email: email,
-                role: email.includes('content') ? 'CONTENT_ADMIN' : 'SUPER_ADMIN',
-              },
-            },
-          };
-        } else {
-          throw err;
-        }
-      }
+      const res = await api.post('/admin-auth/login', { email, password });
 
-      const receivedToken = res.data.accessToken || res.data.token || res.data.access_token || res.data.tokens?.accessToken || res.data.tokens?.access_token;
-      const receivedUser = res.data.admin || res.data.user || res.data.adminUser || { email, role: 'SUPER_ADMIN' };
+      const receivedToken =
+        res.data?.accessToken ||
+        res.data?.token ||
+        res.data?.access_token ||
+        res.data?.tokens?.accessToken ||
+        res.data?.tokens?.access_token;
+
+      const receivedUser =
+        res.data?.admin ||
+        res.data?.user ||
+        res.data?.adminUser ||
+        { email, role: 'VIEWER' };
+
+      if (!receivedToken) {
+        throw new Error('Authentication succeeded but no access token was returned by the server.');
+      }
 
       setAuthToken(receivedToken);
       setStoredUser(receivedUser);
@@ -106,13 +113,23 @@ export function AuthProvider({ children }) {
     setUserState(null);
   };
 
+  const currentRole = user?.role || '';
+  const isSuperAdmin = currentRole === SUPER_ADMIN_ROLE;
+  const isAdminRole = RECOGNIZED_ADMIN_ROLES.includes(currentRole);
+  const isAuthorizedRole = isSuperAdmin || isAdminRole;
+  const canWrite = isSuperAdmin || currentRole === 'CONTENT_ADMIN';
+
   return (
     <AuthContext.Provider
       value={{
         token,
         user,
-        role: user?.role || 'VIEWER',
-        isAuthenticated: !!token,
+        role: currentRole,
+        isAuthenticated: Boolean(token),
+        isSuperAdmin,
+        isAdminRole,
+        isAuthorizedRole,
+        canWrite,
         loading,
         login,
         logout,
@@ -127,19 +144,21 @@ export function AuthProvider({ children }) {
  * useAuth
  *
  * USE OF FUNCTION:
- *   Consumer hook for accessing the AuthContext.
+ *   Consumer hook for consuming AuthContext state and methods.
  *
  * HOW DOES THE SPECIFIC FUNCTION WORK:
- *   Invokes useContext(AuthContext) and returns session values and login/logout methods.
+ *   Invokes useContext(AuthContext) and returns the current authentication state object.
  *
  * CONCEPTS USED IN THE FUNCTION:
  *   - React useContext hook.
  *
  * PLACES WHERE THIS FUNCTION IS IMPORTED AND USED:
- *   Used across admin components (Sidebar, Login, App).
+ *   Imported across dashboard components (App.jsx, Sidebar.jsx, Login.jsx, etc.).
  *
  * FINAL OUTPUT OF THE FUNCTION:
- *   Returns the current AuthContext value object.
+ *   Authentication context object.
+ *
+ * @returns {object} AuthContext state and helper methods.
  */
 export function useAuth() {
   return useContext(AuthContext);

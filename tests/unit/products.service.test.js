@@ -218,6 +218,28 @@ describe('productsService.updateProduct', () => {
     expect(result.is_active).toBe(false);
   });
 
+  it('passes specifications including dimensions to repository when provided', async () => {
+    repo.findProductByIdOrSlug.mockResolvedValue(MOCK_PRODUCT);
+    const newSpecs = [
+      { spec_type: 'DIMENSION', spec_key: 'Width', spec_value: '300', unit: 'mm' },
+      { spec_type: 'DIMENSION', spec_key: 'Ply Rating', spec_value: '12PR', unit: null },
+    ];
+    const updatedProduct = { ...MOCK_PRODUCT, specifications: newSpecs };
+    repo.updateProduct.mockResolvedValue(updatedProduct);
+
+    const result = await productsService.updateProduct(ADMIN_ID, 'prod-cuid-1', {
+      name: 'Grip Master 500 V2',
+      specifications: newSpecs,
+    });
+
+    expect(repo.updateProduct).toHaveBeenCalledWith(
+      'prod-cuid-1',
+      { name: 'Grip Master 500 V2' },
+      newSpecs
+    );
+    expect(result.specifications).toHaveLength(2);
+  });
+
   it('throws 404 when updating non-existent product', async () => {
     repo.findProductByIdOrSlug.mockResolvedValue(null);
 

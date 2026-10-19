@@ -436,7 +436,8 @@ async function updateProduct(adminId, id, payload) {
     throw ApiError.notFound('Product not found.');
   }
 
-  const updateData = { ...payload };
+  const { specifications, ...rest } = payload;
+  const updateData = { ...rest };
 
   if (payload.category_id) {
     const category = await categoriesRepo.findCategoryByIdOrSlug(payload.category_id);
@@ -455,7 +456,11 @@ async function updateProduct(adminId, id, payload) {
     updateData.slug = finalSlug;
   }
 
-  const updated = await repo.updateProduct(existing.id, updateData);
+  const updateArgs = [existing.id, updateData];
+  if (specifications !== undefined) {
+    updateArgs.push(specifications);
+  }
+  const updated = await repo.updateProduct(...updateArgs);
 
   await auditService.record({
     actorId: adminId,

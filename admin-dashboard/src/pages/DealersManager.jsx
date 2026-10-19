@@ -29,6 +29,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
+import Pagination from '../components/Pagination';
 
 const DEALER_TYPES = ['DEALER', 'DISTRIBUTOR'];
 
@@ -325,30 +326,13 @@ export default function DealersManager() {
           </div>
         )}
 
-        {/* Pagination Footer */}
-        {pagination.totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-            <div>
-              Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} items)
-            </div>
-            <div className="flex gap-1">
-              <button
-                disabled={pagination.page <= 1}
-                onClick={() => fetchDealers(pagination.page - 1)}
-                className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <button
-                disabled={pagination.page >= pagination.totalPages}
-                onClick={() => fetchDealers(pagination.page + 1)}
-                className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          pageSize={pagination.pageSize}
+          onPageChange={(newPage) => fetchDealers(newPage)}
+        />
       </div>
 
       {/* Modal */}

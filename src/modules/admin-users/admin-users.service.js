@@ -217,10 +217,39 @@ async function listOrganizations({ type, approval_status, status, page = 1, page
   };
 }
 
+/**
+ * updateOrganizationApproval
+ *
+ * 1. The use of function:
+ *    Modifies the compliance verification status (APPROVED, REJECTED, SUSPENDED, PENDING) of a partner organization.
+ * 2. How does the specific function work:
+ *    Validates the target status against allowed enum values, enforces a mandatory non-empty rejection reason
+ *    when rejecting an application, verifies organization existence, updates database state via repository,
+ *    and emits an immutable audit log record containing decision metadata.
+ * 3. Concepts used in the function:
+ *    Partner verification governance, mandatory compliance justification, defensive validation, audit trail recording.
+ * 4. Places where this function is imported and used:
+ *    Imported in src/modules/admin-users/admin-users.controller.js and mounted at PATCH /api/v1/admin/organizations/:id/status.
+ * 5. Final output of the function, before and after:
+ *    Before: Organization in existing approval status.
+ *    After: Organization updated to target approval status with audit trail capturing the decision and justification.
+ *
+ * @param {object} actor - Authenticated administrator performing the update.
+ * @param {string} id - Organization PK.
+ * @param {object} body - Request payload containing status and optional rejection_reason.
+ * @returns {Promise<object>} Updated organization record.
+ */
 async function updateOrganizationApproval(actor, id, body = {}) {
   const approval_status = body.approval_status || body.status;
   if (!approval_status || !VALID_APPROVAL_STATUSES.includes(approval_status)) {
     throw ApiError.badRequest(`Invalid approval status. Allowed: ${VALID_APPROVAL_STATUSES.join(', ')}`);
+  }
+
+  if (approval_status === 'REJECTED') {
+    const reason = body.rejection_reason || body.reason;
+    if (!reason || !String(reason).trim()) {
+      throw ApiError.validation('A mandatory rejection reason is required when rejecting an organization.');
+    }
   }
 
   const existing = await repo.findOrganizationById(id);
@@ -230,6 +259,10 @@ async function updateOrganizationApproval(actor, id, body = {}) {
 
   const updated = await repo.updateOrganizationApproval(id, approval_status);
 
+  const rejectionReason = (approval_status === 'REJECTED')
+    ? (body.rejection_reason || body.reason || '').trim()
+    : null;
+
   const recordFn = auditService.recordAudit || auditService.record;
   await recordFn({
     actorId: actor ? actor.id : null,
@@ -238,7 +271,10 @@ async function updateOrganizationApproval(actor, id, body = {}) {
     entityId: id,
     before: { approval_status: existing.approval_status },
     after: { approval_status: updated.approval_status },
-    details: { approval_status },
+    details: {
+      approval_status,
+      rejection_reason: rejectionReason,
+    },
   });
 
   return {
@@ -247,12 +283,33 @@ async function updateOrganizationApproval(actor, id, body = {}) {
   };
 }
 
+async function revokeAdminSessions(actor, id) {
+  const existing = await repo.findAdminById(id);
+  if (!existing) {
+    throw ApiError.notFound('Admin user not found.');
+  }
+
+  const result = await repo.revokeAdminSessions(id);
+
+  const recordFn = auditService.recordAudit || auditService.record;
+  await recordFn({
+    actorId: actor ? actor.id : null,
+    action: 'STATUS_CHANGE',
+    entityType: 'ADMIN_SESSION',
+    entityId: id,
+    details: { revokedCount: result.revokedCount },
+  });
+
+  return { id, message: 'All active sessions for this admin have been revoked.', revokedCount: result.revokedCount, revoked: true };
+}
+
 const adminUsersService = {
   createAdminUser,
   listAdminUsers,
   getAdminUserById,
   updateAdminUser,
   updateAdminStatus,
+  revokeAdminSessions,
   listOrganizations,
   updateOrganizationApproval,
 };

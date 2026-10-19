@@ -445,6 +445,23 @@ describe('Days 9–10 Admin Integration Tests', () => {
       expect(res.status).toBe(403);
     });
 
+    it('Non-SUPER_ADMIN cannot revoke admin sessions', async () => {
+      if (!createdAdminId) return;
+      const res = await request(app)
+        .post(`/api/v1/admin/admin-users/${createdAdminId}/revoke-sessions`)
+        .set('Authorization', `Bearer ${contentAdminToken}`);
+      expect(res.status).toBe(403);
+    });
+
+    it('SUPER_ADMIN can revoke admin sessions', async () => {
+      if (!createdAdminId) return;
+      const res = await request(app)
+        .post(`/api/v1/admin/admin-users/${createdAdminId}/revoke-sessions`)
+        .set('Authorization', `Bearer ${superAdminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.message).toMatch(/revoked/i);
+    });
+
     it('Inactive admin is rejected by adminGuard', async () => {
       if (!createdAdminId) return; // guard: skip if create failed
       // Ensure the created admin is deactivated (status from earlier patch test)

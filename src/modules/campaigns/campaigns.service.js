@@ -254,10 +254,9 @@ const campaignsService = {
     let failureCount = 0;
     const invalidDeviceIds = [];
 
-    if (targetCount > 0) {
-      // Get firebase admin from existing config — NEVER re-initialize
-      const { admin, isFirebaseReady } = require('../../config/firebase');
+    const { admin, isFirebaseReady } = require('../../config/firebase');
 
+    if (targetCount > 0) {
       if (!isFirebaseReady) {
         logger.warn('[CampaignsService] Firebase not configured. FCM send skipped. Campaign will be marked SENT.');
       } else {
@@ -338,7 +337,12 @@ const campaignsService = {
     });
 
     // 10. Return statistics
-    return { targetCount, successCount, failureCount };
+    return {
+      targetCount,
+      successCount,
+      failureCount,
+      mode: isFirebaseReady ? 'DISPATCHED' : 'MOCK / OFFLINE',
+    };
   },
 };
 

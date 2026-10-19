@@ -176,6 +176,12 @@ const testimonialsRepository = {
       data,
     });
   },
+
+  async deleteTestimonial(id, prismaClient = prisma) {
+    return prismaClient.testimonial.delete({
+      where: { id },
+    });
+  },
 };
 
 module.exports = testimonialsRepository;

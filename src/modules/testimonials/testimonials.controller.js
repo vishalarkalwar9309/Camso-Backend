@@ -88,6 +88,13 @@ const testimonialsController = {
     const testimonial = await testimonialsService.updateTestimonial(id, data, req.auditContext);
     return ApiResponse.success(res, testimonial);
   },
+
+  async adminDelete(req, res) {
+    const { validateCuid } = require('../../core/utils/idValidation');
+    const id = validateCuid(req.params.id);
+    const result = await testimonialsService.deleteTestimonial(id, req.auditContext);
+    return ApiResponse.success(res, result);
+  },
 };
 
 module.exports = testimonialsController;

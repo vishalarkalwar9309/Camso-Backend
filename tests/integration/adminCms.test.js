@@ -171,6 +171,28 @@ describe('Admin CMS Integration Tests (Documents, Testimonials, FAQs)', () => {
       expect(res.body.data.is_published).toBe(true);
       expect(res.body.data.customer_name).toBe('Jane Doe');
     });
+
+    it('VIEWER cannot delete testimonial', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/admin/testimonials/${createdId}`)
+        .set('Authorization', `Bearer ${viewerToken}`);
+      
+      expect(res.status).toBe(403);
+    });
+
+    it('CONTENT_ADMIN should delete a testimonial', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/admin/testimonials/${createdId}`)
+        .set('Authorization', `Bearer ${contentAdminToken}`);
+      
+      expect(res.status).toBe(200);
+      expect(res.body.data.deleted).toBe(true);
+
+      const checkRes = await request(app)
+        .get(`/api/v1/admin/testimonials/${createdId}`)
+        .set('Authorization', `Bearer ${contentAdminToken}`);
+      expect(checkRes.status).toBe(404);
+    });
   });
 
   describe('FAQs Admin', () => {

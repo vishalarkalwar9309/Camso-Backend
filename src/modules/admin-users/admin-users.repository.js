@@ -126,6 +126,14 @@ async function updateAdminUser(id, data) {
   });
 }
 
+async function revokeAdminSessions(id) {
+  const result = await prisma.adminRefreshToken.updateMany({
+    where: { admin_id: String(id), revoked_at: null },
+    data: { revoked_at: new Date() },
+  });
+  return { revokedCount: result.count };
+}
+
 // ---------------------------------------------------------------------------
 // Organizations (Dealers & Distributors) Management
 // ---------------------------------------------------------------------------
@@ -220,6 +228,7 @@ const adminUsersRepository = {
   findAllAdminUsers,
   updateAdminStatus,
   updateAdminUser,
+  revokeAdminSessions,
   listOrganizations,
   updateOrganizationApproval,
   findOrganizationById,

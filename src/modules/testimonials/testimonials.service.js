@@ -191,6 +191,24 @@ const testimonialsService = {
 
     return testimonial;
   },
+
+  async deleteTestimonial(id, reqAuditContext) {
+    const existing = await testimonialsRepository.findAdminTestimonialById(id);
+    if (!existing) throw require('../../core/utils/ApiError').notFound('Testimonial not found.');
+
+    await testimonialsRepository.deleteTestimonial(id);
+
+    await require('../../core/services/auditService').record({
+      ...reqAuditContext,
+      action: 'DELETE',
+      entityType: 'TESTIMONIAL',
+      entityId: id,
+      before: existing,
+      after: null,
+    });
+
+    return { id, deleted: true, message: 'Testimonial permanently deleted.' };
+  },
 };
 
 module.exports = testimonialsService;

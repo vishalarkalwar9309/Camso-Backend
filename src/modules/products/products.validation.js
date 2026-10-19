@@ -90,6 +90,16 @@ const updateProductSchema = Joi.object({
   applications:         Joi.array().items(Joi.string().trim()).optional(),
   compatible_equipment: Joi.array().items(Joi.string().trim()).optional(),
   data_provenance:      Joi.string().trim().max(100).optional(),
+  specifications: Joi.array().items(
+    Joi.object({
+      spec_type:     Joi.string().valid('SPECIFICATION', 'DIMENSION', 'PERFORMANCE').default('SPECIFICATION'),
+      spec_key:      Joi.string().trim().min(1).max(100).required(),
+      spec_value:    Joi.string().trim().min(1).max(255).required(),
+      unit:          Joi.string().trim().max(30).allow(null, '').optional(),
+      is_filterable: Joi.boolean().default(false).optional(),
+      sort_order:    Joi.number().integer().default(0).optional(),
+    })
+  ).optional(),
 }).min(1);
 
 const attachImageSchema = Joi.object({

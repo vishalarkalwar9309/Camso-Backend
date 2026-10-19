@@ -97,9 +97,13 @@ router.use('/admin/analytics', adminAnalyticsRoutes);
 // Admin Authentication & Administration
 const adminAuthRoutes = require('../modules/admin-auth/admin-auth.routes');
 const { adminUsersRouter, adminOrgsRouter } = require('../modules/admin-users/admin-users.routes');
+const auditLogsRoutes = require('../modules/audit-logs/audit-logs.routes');
+const systemHealthRoutes = require('../modules/system-health/system-health.routes');
 router.use('/admin-auth', adminAuthRoutes);
 router.use('/admin/admin-users', adminUsersRouter);
 router.use('/admin/organizations', adminOrgsRouter);
+router.use('/admin/audit-logs', auditLogsRoutes);
+router.use('/admin/system-health', systemHealthRoutes);
 
 // Business Authentication & Portal (Dealer & Distributor)
 const businessAuthRoutes = require('../modules/business-auth/business-auth.routes');

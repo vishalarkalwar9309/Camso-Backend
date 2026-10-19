@@ -20,6 +20,7 @@ adminUsersRouter.get('/', requireRole('SUPER_ADMIN'), controller.listAdmins);
 adminUsersRouter.get('/:id', requireRole('SUPER_ADMIN'), controller.getAdminById);
 adminUsersRouter.patch('/:id', requireRole('SUPER_ADMIN'), controller.updateAdmin);
 adminUsersRouter.patch('/:id/status', requireRole('SUPER_ADMIN'), controller.updateAdminStatus);
+adminUsersRouter.post('/:id/revoke-sessions', requireRole('SUPER_ADMIN'), controller.revokeSessions);
 
 // 2. Organizations Approval Router — mounted at /api/v1/admin/organizations
 const adminOrgsRouter = Router();

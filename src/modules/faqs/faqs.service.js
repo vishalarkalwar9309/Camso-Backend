@@ -110,7 +110,11 @@ const faqsService = {
       after: data,
     });
 
-    return faq;
+    return {
+      ...faq,
+      question: data.question || '',
+      answer: data.answer || '',
+    };
   },
 
   async updateFaq(id, data, reqAuditContext) {
@@ -166,7 +170,8 @@ const faqsService = {
       after: updateData,
     });
 
-    return faq;
+    const translations = await getTranslations('FAQ', id);
+    return attachTranslations(faq, translations, 'en');
   },
 };
 
