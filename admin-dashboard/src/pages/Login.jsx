@@ -50,9 +50,30 @@ import { useAuth } from '../context/AuthContext';
  */
 export default function Login() {
   const { login, loading } = useAuth();
-  const [email, setEmail] = useState('admin@camso.test');
-  const [password, setPassword] = useState('Password@123');
+  const [email, setEmail] = useState('demo.admin@camso.local');
+  const [password, setPassword] = useState('admin@2006');
   const [error, setError] = useState('');
+
+  const PRESET_PERSONAS = [
+    {
+      label: 'Super Admin (All)',
+      email: 'demo.admin@camso.local',
+      password: 'admin@2006',
+      roleHint: 'Full Governance & CMS (/super-admin/*)',
+    },
+    {
+      label: 'Content Admin',
+      email: 'admin@camso.test',
+      password: 'admin@2006',
+      roleHint: 'Daily CMS (/admin/*)',
+    },
+  ];
+
+  const handleSelectPreset = (preset) => {
+    setEmail(preset.email);
+    setPassword(preset.password);
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -96,6 +117,33 @@ export default function Login() {
                 <span>{error}</span>
               </div>
             )}
+
+            {/* Quick Preset Selector */}
+            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Fast Sign-In Presets
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {PRESET_PERSONAS.map((preset) => {
+                  const isSelected = email === preset.email;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => handleSelectPreset(preset)}
+                      className={`text-left p-2 rounded-lg border text-xs transition-all ${
+                        isSelected
+                          ? 'border-[#0055b8] bg-blue-50 text-[#0055b8] font-bold shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="font-semibold truncate">{preset.label}</div>
+                      <div className="text-[10px] text-slate-400 font-normal truncate">{preset.email}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
